@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Coach Nikos 🐯 — Strength &amp; Performance Hub</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Coach Nikos — Strength &amp; Performance Hub</title>
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#e74c3c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coach Nikos">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1149,6 +1158,51 @@
     .zone-name { color: #444; }
     .progress-wrap { display: none; }
   }
+
+  /* ── Mobile / PWA improvements ── */
+  @media (max-width: 600px) {
+    header { padding: 20px 16px 14px; }
+
+    .logo-box { padding: 10px 20px; }
+    .logo-box h1 { font-size: 18px; letter-spacing: 3px; }
+
+    main { padding: 24px 16px 80px; }
+
+    .card-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .big-card { padding: 28px 14px; }
+    .big-card .card-icon { font-size: 36px; margin-bottom: 10px; }
+    .big-card .card-title { font-size: 14px; letter-spacing: 1px; }
+
+    .card-grid-3 { grid-template-columns: 1fr; }
+    .card-grid-3 .big-card { padding: 20px 18px; display: flex; align-items: center; gap: 14px; text-align: left; }
+    .card-grid-3 .big-card .card-icon { font-size: 32px; margin-bottom: 0; }
+
+    .systems-grid { grid-template-columns: 1fr; }
+
+    .prog-tabs { grid-template-columns: 1fr 1fr; }
+
+    .action-buttons { grid-template-columns: 1fr; }
+
+    .step-title { font-size: 22px; }
+
+    .inputs-row { grid-template-columns: 1fr 1fr; }
+
+    .result-1rm .big-num { font-size: 72px; }
+
+    .weeks-picker-controls { gap: 14px; }
+    .weeks-display { font-size: 28px; }
+
+    .lib-category-grid { grid-template-columns: 1fr; }
+
+    .progress-label { font-size: 13px; }
+  }
+
+  /* Safe area insets for notched phones */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
 </style>
 </head>
 <body>
@@ -2154,6 +2208,14 @@ function onAction(e) {
 
 // ── Boot ───────────────────────────────────────────────
 render();
+
+// ── Register Service Worker (PWA) ──────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 </script>
 </body>
 </html>
