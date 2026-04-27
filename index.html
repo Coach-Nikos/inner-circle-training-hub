@@ -2576,10 +2576,11 @@ function step7() {
     }
 
     return '<div class="configurator-card">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">' +
         '<div style="width:4px;height:22px;background:' + sysColor + ';border-radius:2px;flex-shrink:0;"></div>' +
         '<span style="font-size:12px;font-weight:800;color:#fff;letter-spacing:1.5px;text-transform:uppercase;">Configure — ' + sysNames[sys] + '</span>' +
       '</div>' +
+      '<p style="font-size:11px;color:#aaa;line-height:1.5;margin-bottom:16px;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:6px;border-left:3px solid ' + sysColor + ';">📋 Adjust the sets and rep range below based on what Coach Nikos has prescribed in your programme. Make sure you select the exact numbers he\'s given you before generating.</p>' +
       '<div class="configurator-row"><span class="configurator-label">Sets</span><div style="display:flex;gap:8px;">' + setsBtns + '</div></div>' +
       extraRow +
       '</div>';
