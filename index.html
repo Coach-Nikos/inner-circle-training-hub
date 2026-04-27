@@ -1276,6 +1276,100 @@
     .band-dot { width: 28px; height: 28px; }
   }
 
+  /* ── RPE Scale ── */
+  .rpe-explainer {
+    background: #0e0e0e;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 20px;
+    margin: 24px 0 20px;
+  }
+
+  .rpe-explainer-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .rpe-explainer-sub {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 18px;
+    line-height: 1.6;
+  }
+
+  .rpe-bar {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+
+  .rpe-seg {
+    flex: 1;
+    border-radius: 6px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.9);
+    transition: transform 0.15s;
+  }
+
+  .rpe-seg.rpe-hot {
+    height: 48px;
+    border: 2px solid rgba(255,255,255,0.4);
+    box-shadow: 0 0 16px rgba(231,76,60,0.35);
+    border-radius: 8px;
+  }
+
+  .rpe-labels {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 16px;
+  }
+
+  .rpe-lbl {
+    flex: 1;
+    text-align: center;
+    font-size: 8px;
+    color: #444;
+    line-height: 1.3;
+    letter-spacing: 0.2px;
+  }
+
+  .rpe-lbl.rpe-hot-lbl { color: #e74c3c; font-weight: 700; font-size: 9px; }
+
+  .rpe-callout {
+    background: rgba(231,76,60,0.08);
+    border: 1px solid rgba(231,76,60,0.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #bbb;
+    line-height: 1.6;
+  }
+
+  .rpe-callout strong { color: #e74c3c; }
+
+  .zone-rpe {
+    font-size: 10px;
+    font-weight: 700;
+    color: #555;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 5px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+    margin-left: auto;
+    margin-right: 8px;
+  }
+
   /* ── Straight Sets card ── */
   .straight-card {
     grid-column: 1 / -1;
@@ -1933,6 +2027,39 @@ function step4() {
     </div>`;
 }
 
+// RPE Scale widget (reused in step5)
+function rpeWidget() {
+  const segs = [
+    { n:1,  color:'#16a34a', label:'Very\nEasy'    },
+    { n:2,  color:'#22c55e', label:'Easy'          },
+    { n:3,  color:'#4ade80', label:'Light'         },
+    { n:4,  color:'#86efac', label:'Moderate'      },
+    { n:5,  color:'#fbbf24', label:'Somewhat\nHard'},
+    { n:6,  color:'#f59e0b', label:'Hard'          },
+    { n:7,  color:'#fb923c', label:'Very\nHard'    },
+    { n:8,  color:'#f97316', label:'2 Reps\nLeft ✅', hot:true },
+    { n:9,  color:'#ef4444', label:'1 Rep\nLeft ✅', hot:true },
+    { n:10, color:'#991b1b', label:'Failure'       },
+  ];
+  const bars  = segs.map(s =>
+    '<div class="rpe-seg' + (s.hot ? ' rpe-hot' : '') + '" style="background:' + s.color + '">' + s.n + '</div>'
+  ).join('');
+  const lbls  = segs.map(s =>
+    '<div class="rpe-lbl' + (s.hot ? ' rpe-hot-lbl' : '') + '">' + s.label.replace('\n','<br>') + '</div>'
+  ).join('');
+  return '<div class="rpe-explainer">' +
+    '<div class="rpe-explainer-title">⚡ RPE Scale — Train at the Right Intensity</div>' +
+    '<div class="rpe-explainer-sub">RPE = Rate of Perceived Exertion. To get accurate results from this calculator, your numbers must be based on a genuine RPE 8–9 effort.</div>' +
+    '<div class="rpe-bar">' + bars + '</div>' +
+    '<div class="rpe-labels">' + lbls + '</div>' +
+    '<div class="rpe-callout">' +
+    '💪 <strong>Coach Nikos trains at RPE 8–9.</strong> That means after your last rep you should have <strong>no more than 1–2 reps left</strong> in the tank. ' +
+    'If you could easily do 4 or 5 more, the weight is too light and your numbers will be underestimated. ' +
+    'Push to that honest edge — <strong>that\'s where real progress is made.</strong>' +
+    '</div>' +
+    '</div>';
+}
+
 // Step 5 — Enter stats
 function step5() {
   const u = state.unit.toUpperCase();
@@ -1982,6 +2109,7 @@ function step5() {
     }).join('');
 
     return header +
+      rpeWidget() +
       '<p class="step-subtitle" style="margin-top:20px;">Select the resistance bands you\'re using and enter your reps — we\'ll calculate your estimated 1RM and show you exactly which band combinations to use for every set and every week of your programme.</p>' +
       '<div class="input-card">' +
         '<div class="input-label">Select Your Resistance Bands</div>' +
@@ -2028,6 +2156,7 @@ function step5() {
 
   // ── GYM: STANDARD REPS + WEIGHT ───────────────────────
   return header +
+    rpeWidget() +
     '<p class="step-subtitle" style="margin-top:20px;">Enter what you\'re currently lifting in terms of reps and weight. We\'ll use this to estimate your 1 Rep Max and calculate the precise training loads you should be working with across every rep range and training system.</p>' +
     '<div class="input-card">' +
       '<div class="input-label">Weight Unit</div>' +
@@ -2063,14 +2192,14 @@ function step6() {
   // Ascend Pyramid: 60@15r, 67@12r, 75@10r, 80@8r, 85@6r
   // Percentage Training Cycle (PTC): 90@3r, 100@1r
   const unifiedZones = [
-    { pct: 60,   reps: 15, color: '#3b82f6', name: 'Endurance / High Volume' },
-    { pct: 67,   reps: 12, color: '#6366f1', name: 'Hypertrophy — Volume Training' },
-    { pct: 75,   reps: 10, color: '#8b5cf6', name: 'Hypertrophy — Progressive Load' },
-    { pct: 80,   reps: 8,  color: '#f59e0b', name: 'Strength-Hypertrophy' },
-    { pct: 85,   reps: 6,  color: '#f97316', name: 'Strength Development' },
-    { pct: 85,   reps: 5,  color: '#ef4444', name: 'Peaking / Heavy Strength' },
-    { pct: 90,   reps: 3,  color: '#dc2626', name: 'Max Effort / Near-Failure' },
-    { pct: 100,  reps: 1,  color: '#991b1b', name: '1 Rep Max' },
+    { pct: 60,   reps: 15, color: '#3b82f6', name: 'Endurance / High Volume',       rpe: '6–7'  },
+    { pct: 67,   reps: 12, color: '#6366f1', name: 'Hypertrophy — Volume Training',  rpe: '7'    },
+    { pct: 75,   reps: 10, color: '#8b5cf6', name: 'Hypertrophy — Progressive Load', rpe: '8'    },
+    { pct: 80,   reps: 8,  color: '#f59e0b', name: 'Strength-Hypertrophy',           rpe: '8–9'  },
+    { pct: 85,   reps: 6,  color: '#f97316', name: 'Strength Development',           rpe: '9'    },
+    { pct: 85,   reps: 5,  color: '#ef4444', name: 'Peaking / Heavy Strength',       rpe: '9'    },
+    { pct: 90,   reps: 3,  color: '#dc2626', name: 'Max Effort / Near-Failure',      rpe: '9–10' },
+    { pct: 100,  reps: 1,  color: '#991b1b', name: '1 Rep Max',                      rpe: '10'   },
   ];
   const unifiedRows = unifiedZones.map(z => {
     const w = round25(rm * z.pct / 100);
@@ -2084,6 +2213,7 @@ function step6() {
       <div class="zone-pct" style="color:${z.color}">${z.pct}%</div>
       <div class="zone-reps">${repsLabel}</div>
       <div class="zone-weight" style="${state.trainingMode === 'bands'?'min-width:160px;':''}">${weightDisplay}</div>
+      <span class="zone-rpe">RPE ${z.rpe}</span>
       <div class="zone-name">${z.name}</div>
     </div>`;
   }).join('');
