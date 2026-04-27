@@ -1657,7 +1657,9 @@ const state = {
   bandReps: '',
   straightRange: '10-12',
   ascendSets: 5,
+  ascendStartIdx: 0,
   reverseSets: 5,
+  reverseStartIdx: 0,
   straightSets: 4,
   showDates: false,
   programStartDate: '',
@@ -2007,7 +2009,8 @@ function dots(active) {
     </div>`;
 }
 
-function render() {
+function render(preserveScroll = false) {
+  const scrollY = window.scrollY;
   const app = document.getElementById('app');
   let html = '';
   if (state.inLibrary) {
@@ -2026,7 +2029,11 @@ function render() {
   }
   app.innerHTML = html;
   wireEvents();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (preserveScroll) {
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 // Library — category overview
@@ -2379,19 +2386,41 @@ function step6() {
   // Full set arrays
   const ascendFull  = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
   const reverseFull = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
-  const ascendSlice  = ascendFull.slice(ascendFull.length - state.ascendSets);
-  const reverseSlice = reverseFull.slice(0, state.reverseSets);
+
+  // Clamp start indices to valid range
+  const aMaxStart = ascendFull.length - state.ascendSets;
+  const rMaxStart = reverseFull.length - state.reverseSets;
+  const aStart = Math.min(state.ascendStartIdx, aMaxStart);
+  const rStart = Math.min(state.reverseStartIdx, rMaxStart);
+  const ascendSlice  = ascendFull.slice(aStart, aStart + state.ascendSets);
+  const reverseSlice = reverseFull.slice(rStart, rStart + state.reverseSets);
+
+  // Helper: start-at selector (shown when multiple options exist)
+  function startSelector(full, nSets, currentStart, action, color) {
+    const maxStart = full.length - nSets;
+    if (maxStart < 1) return '';
+    const btns = Array.from({length: maxStart + 1}, (_, i) => {
+      const active = currentStart === i;
+      return '<button class="sets-btn' + (active ? ' active' : '') + '" ' +
+        'style="width:auto;padding:0 8px;' + (active ? 'border-color:' + color + ';background:' + color + ';' : '') + '" ' +
+        'data-a="' + action + '" data-v="' + i + '">' + full[i].reps + '</button>';
+    }).join('');
+    return '<div class="sets-selector" style="margin-left:8px;">' +
+      '<span class="sets-selector-label">From</span>' + btns + '</div>';
+  }
 
   const sysData = [
     {
       key: 'ascend', name: 'Ascend Pyramid', color: '#f59e0b',
       desc: ascendSlice.map(s => s.reps).join(' → ') + ' reps',
       sets: ascendSlice, adjustable: true, setsAction: 'setAscendSets', setsCount: state.ascendSets,
+      startSelector: startSelector(ascendFull, state.ascendSets, aStart, 'setAscendStart', '#f59e0b'),
     },
     {
       key: 'reverse', name: 'Reverse Pyramid', color: '#8b5cf6',
       desc: reverseSlice.map(s => s.reps).join(' → ') + ' reps',
       sets: reverseSlice, adjustable: true, setsAction: 'setReverseSets', setsCount: state.reverseSets,
+      startSelector: startSelector(reverseFull, state.reverseSets, rStart, 'setReverseStart', '#8b5cf6'),
     },
     {
       key: '5x5', name: '5x5 Strength Training', color: '#3b82f6',
@@ -2470,15 +2499,18 @@ function step6() {
         ${sysWtDisplay}
       </div>`;
     }).join('');
-    const selector = sys.adjustable ? setsSelector(sys.setsAction, sys.setsCount, sys.color) : '';
+    const selector    = sys.adjustable ? setsSelector(sys.setsAction, sys.setsCount, sys.color) : '';
+    const startSel    = sys.startSelector || '';
     return `<div class="system-card">
-      <div class="system-card-header">
+      <div class="system-card-header" style="flex-wrap:wrap;gap:8px;">
         <div class="system-color-bar" style="background:${sys.color}"></div>
-        <div>
+        <div style="flex:1;min-width:0;">
           <div class="system-name" style="color:${sys.color}">${sys.name}</div>
           <div class="system-desc">${sys.desc}</div>
         </div>
-        ${selector}
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          ${selector}${startSel}
+        </div>
       </div>
       ${rows}
     </div>`;
@@ -2544,7 +2576,8 @@ function step7() {
 
   if (sys === 'ascend') {
     const fullA = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
-    const base  = fullA.slice(fullA.length - state.ascendSets);
+    const aS7 = Math.min(state.ascendStartIdx, fullA.length - state.ascendSets);
+    const base  = fullA.slice(aS7, aS7 + state.ascendSets);
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => ({
       label: lbl,
@@ -2557,7 +2590,8 @@ function step7() {
     }));
   } else if (sys === 'reverse') {
     const fullR = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
-    const base  = fullR.slice(0, state.reverseSets);
+    const rS7 = Math.min(state.reverseStartIdx, fullR.length - state.reverseSets);
+    const base  = fullR.slice(rS7, rS7 + state.reverseSets);
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => ({
       label: lbl,
@@ -2800,11 +2834,11 @@ function onAction(e) {
       state.step = 5; break;
 
     case 'unit':
-      state.unit = v; render(); return;
+      state.unit = v; render(true); return;
 
     case 'toggleDirect':
       state.directEntry = !state.directEntry;
-      state.weight = ''; render(); return;
+      state.weight = ''; render(true); return;
 
     case 'calculate': {
       const reps   = parseFloat(state.reps);
@@ -2827,7 +2861,7 @@ function onAction(e) {
       if (state.step === 5 && state.trainingMode) {
         state.trainingMode = null; state.directEntry = false;
         state.selectedBands = []; state.bandReps = '';
-        render(); return;
+        render(true); return;
       }
       if (state.step > 1) {
         state.step--;
@@ -2846,20 +2880,20 @@ function onAction(e) {
 
     case 'selectSystem':
       state.selectedSystem = v;
-      render(); return;
+      render(true); return;
 
     case 'incrWeeks':
       if (state.programWeeks < 12) state.programWeeks++;
-      render(); return;
+      render(true); return;
 
     case 'decrWeeks':
       if (state.programWeeks > 2) state.programWeeks--;
-      render(); return;
+      render(true); return;
 
     case 'toggleDates':
       state.showDates = !state.showDates;
       if (!state.showDates) state.programStartDate = '';
-      render(); return;
+      render(true); return;
 
     case 'restart':
       Object.assign(state, {
@@ -2868,32 +2902,42 @@ function onAction(e) {
         directEntry: false, selectedSystem: 'ascend', programWeeks: 6,
         inLibrary: false, libraryCategory: null,
         trainingMode: null, selectedBands: [], bandReps: '',
-        straightRange: '10-12', ascendSets: 5, reverseSets: 5, straightSets: 4,
+        straightRange: '10-12', ascendSets: 5, ascendStartIdx: 0, reverseSets: 5, reverseStartIdx: 0, straightSets: 4,
         showDates: false, programStartDate: '',
       }); break;
 
     case 'selectStraightRange':
-      state.straightRange = v; render(); return;
+      state.straightRange = v; render(true); return;
 
     case 'setStraightSets':
-      state.straightSets = parseInt(v); render(); return;
+      state.straightSets = parseInt(v); render(true); return;
 
     case 'setAscendSets':
-      state.ascendSets = parseInt(v); render(); return;
+      state.ascendSets = parseInt(v);
+      state.ascendStartIdx = Math.min(state.ascendStartIdx, 5 - parseInt(v));
+      render(true); return;
+
+    case 'setAscendStart':
+      state.ascendStartIdx = parseInt(v); render(true); return;
 
     case 'setReverseSets':
-      state.reverseSets = parseInt(v); render(); return;
+      state.reverseSets = parseInt(v);
+      state.reverseStartIdx = Math.min(state.reverseStartIdx, 5 - parseInt(v));
+      render(true); return;
+
+    case 'setReverseStart':
+      state.reverseStartIdx = parseInt(v); render(true); return;
 
     case 'selectTrainingMode':
       state.trainingMode = v || null;
       state.selectedBands = []; state.bandReps = '';
-      state.directEntry = false; render(); return;
+      state.directEntry = false; render(true); return;
 
     case 'toggleBand': {
       const idx = state.selectedBands.indexOf(v);
       if (idx > -1) state.selectedBands.splice(idx, 1);
       else state.selectedBands.push(v);
-      render(); return;
+      render(true); return;
     }
 
     case 'calculateBands': {
