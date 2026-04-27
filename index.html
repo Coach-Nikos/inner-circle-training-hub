@@ -1276,6 +1276,56 @@
     .band-dot { width: 28px; height: 28px; }
   }
 
+  /* ── Straight Sets card ── */
+  .straight-card {
+    grid-column: 1 / -1;
+  }
+
+  .straight-range-wrap {
+    padding: 14px 16px 4px;
+    border-bottom: 1px solid #1e1e1e;
+  }
+
+  .straight-range-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #555;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .straight-range-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .range-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1.5px solid #2a2a2a;
+    background: transparent;
+    color: #666;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .range-btn:hover { border-color: #22c55e; color: #22c55e; }
+  .range-btn.active { border-color: #22c55e; background: rgba(34,197,94,0.12); color: #22c55e; }
+
+  .straight-rule {
+    font-size: 11px;
+    color: #444;
+    line-height: 1.6;
+    padding-bottom: 10px;
+  }
+
+  .straight-rule strong { color: #22c55e; }
+
   /* ── Training mode choice cards ── */
   .mode-choice-grid {
     display: grid;
@@ -1381,6 +1431,7 @@ const state = {
   trainingMode: null,
   selectedBands: [],
   bandReps: '',
+  straightRange: '10-12',
 };
 
 // ── Data ───────────────────────────────────────────────
@@ -2065,6 +2116,49 @@ function step6() {
     },
   ];
 
+  // Straight Sets card
+  const straightRanges = {
+    '6-8':   { low: 6,  high: 8,  pct: 85 },
+    '8-10':  { low: 8,  high: 10, pct: 80 },
+    '10-12': { low: 10, high: 12, pct: 75 },
+    '12-15': { low: 12, high: 15, pct: 67 },
+  };
+  const sr = straightRanges[state.straightRange] || straightRanges['10-12'];
+  const srWgt = round25(rm * sr.pct / 100);
+  const srWgtKg = state.unit === 'lbs' ? srWgt / 2.205 : srWgt;
+  const srRangeBtns = Object.keys(straightRanges).map(k =>
+    `<button class="range-btn ${state.straightRange === k ? 'active' : ''}" data-a="selectStraightRange" data-v="${k}">${k} reps</button>`
+  ).join('');
+  const srRows = Array.from({length: 4}, (_, i) => {
+    const wtDisplay = state.trainingMode === 'bands'
+      ? `<span class="set-weight" style="color:#22c55e;font-size:11px;text-align:right;">${bandDots(srWgtKg)}${bandLabel(srWgtKg)}</span>`
+      : `<span class="set-weight" style="color:#22c55e">${fmt(srWgt)} ${u}</span>`;
+    return `<div class="system-set-row">
+      <span class="set-label">Set ${i+1}</span>
+      <span class="set-reps">${sr.low}–${sr.high} reps</span>
+      ${wtDisplay}
+    </div>`;
+  }).join('');
+  const straightCard = `<div class="system-card straight-card">
+    <div class="system-card-header">
+      <div class="system-color-bar" style="background:#22c55e"></div>
+      <div>
+        <div class="system-name" style="color:#22c55e">Straight Sets</div>
+        <div class="system-desc">4 sets · same weight · rep range method</div>
+      </div>
+    </div>
+    <div class="straight-range-wrap">
+      <div class="straight-range-label">Select Rep Range</div>
+      <div class="straight-range-btns">${srRangeBtns}</div>
+      <div class="straight-rule">
+        ✅ <strong>Hit every rep in range?</strong> Weight is right. &nbsp;
+        🔺 <strong>Blowing past the top?</strong> Too light — go heavier. &nbsp;
+        🔻 <strong>Can't reach the bottom?</strong> Too heavy — go lighter.
+      </div>
+    </div>
+    ${srRows}
+  </div>`;
+
   const systemCards = sysData.map(sys => {
     const rows = sys.sets.map((s, i) => {
       const w     = round25(rm * s.pct / 100);
@@ -2107,7 +2201,7 @@ function step6() {
     <div class="divider"></div>
     <div class="section-heading">Your Numbers Across All Training Systems</div>
     <div class="section-sub">${state.lift} · Based on estimated 1RM of ${fmt(rm)} ${u}</div>
-    <div class="systems-grid">${systemCards}</div>
+    <div class="systems-grid">${systemCards}${straightCard}</div>
     <button class="calc-btn" data-a="genProg" style="margin-bottom:16px;">
       📅 GENERATE MY NUMBERS TO PLAN MY TRAINING SESSIONS →
     </button>
@@ -2127,11 +2221,20 @@ function step7() {
   const n = state.programWeeks;
 
   const tabs = [
-    { key: 'ascend',  label: 'Ascend Pyramid' },
-    { key: 'reverse', label: 'Reverse Pyramid' },
-    { key: '5x5',     label: '5x5 Strength Training' },
-    { key: 'cycle',   label: 'Percentage Training Cycle (PTC)' },
+    { key: 'ascend',   label: 'Ascend Pyramid' },
+    { key: 'reverse',  label: 'Reverse Pyramid' },
+    { key: '5x5',      label: '5x5 Strength Training' },
+    { key: 'cycle',    label: 'Percentage Training Cycle (PTC)' },
+    { key: 'straight', label: 'Straight Sets' },
   ];
+
+  const straightRanges7 = {
+    '6-8':   { low: 6,  high: 8,  pct: 85 },
+    '8-10':  { low: 8,  high: 10, pct: 80 },
+    '10-12': { low: 10, high: 12, pct: 75 },
+    '12-15': { low: 12, high: 15, pct: 67 },
+  };
+  const sr7 = straightRanges7[state.straightRange] || straightRanges7['10-12'];
 
   const tabsHtml = tabs.map(t => `
     <button class="prog-tab ${sys === t.key ? 'active' : ''}" data-a="selectSystem" data-v="${t.key}">
@@ -2178,6 +2281,29 @@ function step7() {
         })),
       };
     });
+  } else if (sys === 'straight') {
+    const baseWgt = round25(rm * sr7.pct / 100);
+    const phaseLen = 3;
+    const phaseNotes = ['Build through the range', 'Aim for middle of range', 'Push to top of range ✅ → ready to progress'];
+    const wkLabels = buildWeekLabels(n);
+    weeks = wkLabels.map((lbl, wi) => {
+      const phase    = Math.floor(wi / phaseLen);
+      const wkInPhase = wi % phaseLen;
+      const wgt      = baseWgt + inc * phase;
+      const isNewPhase = phase > 0 && wkInPhase === 0;
+      const note     = isNewPhase ? `Weight up +${inc}${u} — back to bottom of range` : phaseNotes[wkInPhase];
+      return {
+        label: lbl,
+        note: note,
+        cls: wkInPhase === phaseLen - 1 ? 'pw-green' : (isNewPhase ? 'pw-red' : ''),
+        rows: Array.from({length: 4}, (_, si) => ({
+          label: `Set ${si+1}`,
+          reps: `${sr7.low}–${sr7.high} reps`,
+          weight: wgt,
+          green: false,
+        })),
+      };
+    });
   } else {
     // 6-week strength cycle
     weeks = program.map((w, i) => {
@@ -2209,6 +2335,8 @@ function step7() {
         .map((s, si) => ({ label: `Set ${si+1}`, reps: `${s.reps} reps`, weight: round25(rm * 0.5 * s.pct / 100 * 2), green: true }))
     : sys === '5x5'
     ? Array.from({length: 5}, (_, si) => ({ label: `Set ${si+1}`, reps: '5 reps', weight: round25(rm * 0.5), green: true }))
+    : sys === 'straight'
+    ? Array.from({length: 4}, (_, si) => ({ label: `Set ${si+1}`, reps: `${sr7.low}–${sr7.high} reps`, weight: round25(rm * 0.5), green: true }))
     : [{ label: 'All Sets', reps: '5–10 reps', weight: round25(rm * 0.5), green: true, prefix: '', suffix: '' }];
 
   weeks.push({
@@ -2402,8 +2530,12 @@ function onAction(e) {
         unit: 'kg', sets: '', reps: '', weight: '', oneRM: null,
         directEntry: false, selectedSystem: 'ascend', programWeeks: 6,
         inLibrary: false, libraryCategory: null,
-        trainingMode: null, selectedBands: [], bandReps: ''
+        trainingMode: null, selectedBands: [], bandReps: '',
+        straightRange: '10-12',
       }); break;
+
+    case 'selectStraightRange':
+      state.straightRange = v; render(); return;
 
     case 'selectTrainingMode':
       state.trainingMode = v || null;
