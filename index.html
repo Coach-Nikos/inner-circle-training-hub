@@ -1513,6 +1513,52 @@
 
   .straight-rule strong { color: #22c55e; }
 
+  /* ── System selection (Step 6) ── */
+  .system-card.selectable { cursor: pointer; }
+  .system-card.selectable:hover { border-color: #3a3a3a; transform: translateY(-1px); transition: border-color 0.2s, transform 0.15s, background 0.2s; }
+
+  .sys-check-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 900;
+    color: #111;
+    z-index: 2;
+  }
+
+  /* ── Step 7 Configurator ── */
+  .configurator-card {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+
+  .configurator-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .configurator-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #555;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    min-width: 90px;
+  }
+
   /* ── Sets selector ── */
   .sets-selector {
     display: flex;
@@ -1647,7 +1693,7 @@ const state = {
   weight: '',
   oneRM: null,
   directEntry: false,
-  selectedSystem: 'ascend',
+  selectedSystem: null,
   programWeeks: 6,
   inLibrary: false,
   libraryCategory: null,
@@ -2334,15 +2380,12 @@ function step5() {
     '<p class="err-msg" id="errMsg"></p>';
 }
 
-// Step 6 — Training systems dashboard
+// Step 6 — Choose training system
 function step6() {
   const rm = state.oneRM;
   const u  = state.unit;
 
-  // Unified training zones + rep ranges table
-  // Percentages aligned to match the training systems below:
-  // Ascend Pyramid: 60@15r, 67@12r, 75@10r, 80@8r, 85@6r
-  // Percentage Training Cycle (PTC): 90@3r, 100@1r
+  // Unified training zones
   const unifiedZones = [
     { pct: 60,   reps: 15, color: '#3b82f6', name: 'Endurance / High Volume',       rpe: '6–7'  },
     { pct: 67,   reps: 12, color: '#6366f1', name: 'Hypertrophy — Volume Training',  rpe: '7'    },
@@ -2370,150 +2413,76 @@ function step6() {
     </div>`;
   }).join('');
 
-  // Helper: sets selector buttons
-  function setsSelector(action, current, color) {
-    return '<div class="sets-selector">' +
-      '<span class="sets-selector-label">Sets</span>' +
-      [3,4,5].map(n => {
-        const active = current === n;
-        return '<button class="sets-btn' + (active ? ' active' : '') + '" ' +
-          'style="' + (active ? 'border-color:' + color + ';background:' + color + ';' : '') + '" ' +
-          'data-a="' + action + '" data-v="' + n + '">' + n + '</button>';
-      }).join('') +
-      '</div>';
+  // Color helper
+  function hexRgb(h) {
+    const m = {'#22c55e':'34,197,94','#f59e0b':'245,158,11','#8b5cf6':'139,92,246','#3b82f6':'59,130,246','#e74c3c':'231,76,60'};
+    return m[h] || '255,255,255';
   }
 
-  // Full set arrays
-  const ascendFull  = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
-  const reverseFull = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
-
-  // Clamp start indices to valid range
-  const aMaxStart = ascendFull.length - state.ascendSets;
-  const rMaxStart = reverseFull.length - state.reverseSets;
-  const aStart = Math.min(state.ascendStartIdx, aMaxStart);
-  const rStart = Math.min(state.reverseStartIdx, rMaxStart);
-  const ascendSlice  = ascendFull.slice(aStart, aStart + state.ascendSets);
-  const reverseSlice = reverseFull.slice(rStart, rStart + state.reverseSets);
-
-  // Helper: start-at selector (shown when multiple options exist)
-  function startSelector(full, nSets, currentStart, action, color) {
-    const maxStart = full.length - nSets;
-    if (maxStart < 1) return '';
-    const btns = Array.from({length: maxStart + 1}, (_, i) => {
-      const active = currentStart === i;
-      return '<button class="sets-btn' + (active ? ' active' : '') + '" ' +
-        'style="width:auto;padding:0 8px;' + (active ? 'border-color:' + color + ';background:' + color + ';' : '') + '" ' +
-        'data-a="' + action + '" data-v="' + i + '">' + full[i].reps + '</button>';
-    }).join('');
-    return '<div class="sets-selector" style="margin-left:8px;">' +
-      '<span class="sets-selector-label">From</span>' + btns + '</div>';
-  }
-
-  const sysData = [
-    {
-      key: 'ascend', name: 'Ascend Pyramid', color: '#f59e0b',
-      desc: ascendSlice.map(s => s.reps).join(' → ') + ' reps',
-      sets: ascendSlice, adjustable: true, setsAction: 'setAscendSets', setsCount: state.ascendSets,
-      startSelector: startSelector(ascendFull, state.ascendSets, aStart, 'setAscendStart', '#f59e0b'),
+  // All 5 systems as reference cards (no adjusters — configure in Step 7)
+  const allSystems = [
+    { key: 'straight', name: 'Straight Sets', color: '#22c55e',
+      desc: 'Same weight · rep range method',
+      wide: true,
+      rows: Array.from({length:4}, (_,i) => ({label:`Set ${i+1}`, reps:'10–12 reps', pct:75})),
     },
-    {
-      key: 'reverse', name: 'Reverse Pyramid', color: '#8b5cf6',
-      desc: reverseSlice.map(s => s.reps).join(' → ') + ' reps',
-      sets: reverseSlice, adjustable: true, setsAction: 'setReverseSets', setsCount: state.reverseSets,
-      startSelector: startSelector(reverseFull, state.reverseSets, rStart, 'setReverseStart', '#8b5cf6'),
+    { key: 'ascend', name: 'Ascend Pyramid', color: '#f59e0b',
+      desc: '15 → 12 → 10 → 8 → 6 reps',
+      rows: [{label:'Set 1',reps:'15 reps',pct:60},{label:'Set 2',reps:'12 reps',pct:67},{label:'Set 3',reps:'10 reps',pct:75},{label:'Set 4',reps:'8 reps',pct:80},{label:'Set 5',reps:'6 reps',pct:85}],
     },
-    {
-      key: '5x5', name: '5x5 Strength Training', color: '#3b82f6',
+    { key: 'reverse', name: 'Reverse Pyramid', color: '#8b5cf6',
+      desc: '6 → 8 → 10 → 12 → 15 reps',
+      rows: [{label:'Set 1',reps:'6 reps',pct:85},{label:'Set 2',reps:'8 reps',pct:80},{label:'Set 3',reps:'10 reps',pct:75},{label:'Set 4',reps:'12 reps',pct:67},{label:'Set 5',reps:'15 reps',pct:60}],
+    },
+    { key: '5x5', name: '5×5 Strength Training', color: '#3b82f6',
       desc: '5 sets · 5 reps · same weight',
-      sets: [{reps:5,pct:85},{reps:5,pct:85},{reps:5,pct:85},{reps:5,pct:85},{reps:5,pct:85}],
-      adjustable: false,
+      rows: Array.from({length:5}, (_,i) => ({label:`Set ${i+1}`, reps:'5 reps', pct:85})),
     },
-    {
-      key: 'cycle', name: 'Percentage Training Cycle (PTC)', color: '#e74c3c',
-      desc: 'Progressive strength peaking',
-      sets: [
-        {reps:10,pct:70,label:'Wk 1'},{reps:8,pct:75,label:'Wk 2'},
-        {reps:6,pct:80,label:'Wk 3'},{reps:5,pct:85,label:'Wk 4'},
-        {reps:3,pct:90,label:'Wk 5'},{reps:1,pct:100,label:'Wk 6'},
-      ],
-      adjustable: false,
+    { key: 'cycle', name: 'Percentage Training Cycle (PTC)', color: '#e74c3c',
+      desc: 'Progressive strength peaking · 6 weeks',
+      rows: [{label:'Wk 1',reps:'10 reps',pct:70},{label:'Wk 2',reps:'8 reps',pct:75},{label:'Wk 3',reps:'6 reps',pct:80},{label:'Wk 4',reps:'5 reps',pct:85},{label:'Wk 5',reps:'3 reps',pct:90},{label:'Wk 6',reps:'1 rep',pct:100}],
     },
   ];
 
-  // Straight Sets card (shown first)
-  const straightRanges = {
-    '6-8':   { low: 6,  high: 8,  pct: 85 },
-    '8-10':  { low: 8,  high: 10, pct: 80 },
-    '10-12': { low: 10, high: 12, pct: 75 },
-    '12-15': { low: 12, high: 15, pct: 67 },
-  };
-  const sr = straightRanges[state.straightRange] || straightRanges['10-12'];
-  const srWgt = round25(rm * sr.pct / 100);
-  const srWgtKg = state.unit === 'lbs' ? srWgt / 2.205 : srWgt;
-  const srRangeBtns = Object.keys(straightRanges).map(k =>
-    `<button class="range-btn ${state.straightRange === k ? 'active' : ''}" data-a="selectStraightRange" data-v="${k}">${k} reps</button>`
-  ).join('');
-  const srSetsSelector = setsSelector('setStraightSets', state.straightSets, '#22c55e');
-  const srRows = Array.from({length: state.straightSets}, (_, i) => {
-    const wtDisplay = state.trainingMode === 'bands'
-      ? `<span class="set-weight" style="color:#22c55e;font-size:11px;text-align:right;">${bandDots(srWgtKg)}${bandLabel(srWgtKg)}</span>`
-      : `<span class="set-weight" style="color:#22c55e">${fmt(srWgt)} ${u}</span>`;
-    return `<div class="system-set-row">
-      <span class="set-label">Set ${i+1}</span>
-      <span class="set-reps">${sr.low}–${sr.high} reps</span>
-      ${wtDisplay}
-    </div>`;
-  }).join('');
-  const straightCard = `<div class="system-card straight-card">
-    <div class="system-card-header">
-      <div class="system-color-bar" style="background:#22c55e"></div>
-      <div>
-        <div class="system-name" style="color:#22c55e">Straight Sets</div>
-        <div class="system-desc">${state.straightSets} sets · same weight · rep range method</div>
-      </div>
-      ${srSetsSelector}
-    </div>
-    <div class="straight-range-wrap">
-      <div class="straight-range-label">Select Rep Range</div>
-      <div class="straight-range-btns">${srRangeBtns}</div>
-      <div class="straight-rule">
-        ✅ <strong>Hit every rep in range?</strong> Weight is right. &nbsp;
-        🔺 <strong>Blowing past the top?</strong> Too light — go heavier. &nbsp;
-        🔻 <strong>Can't reach the bottom?</strong> Too heavy — go lighter.
-      </div>
-    </div>
-    ${srRows}
-  </div>`;
-
-  const systemCards = sysData.map(sys => {
-    const rows = sys.sets.map((s, i) => {
-      const w     = round25(rm * s.pct / 100);
-      const label = sys.key === 'cycle' ? s.label : `Set ${i+1}`;
-      const wKg2  = state.unit === 'lbs' ? w / 2.205 : w;
-      const sysWtDisplay = state.trainingMode === 'bands'
-        ? `<span class="set-weight" style="color:${sys.color};font-size:11px;text-align:right;">${bandDots(wKg2)}${bandLabel(wKg2)}</span>`
+  const cards = allSystems.map(sys => {
+    const sel = state.selectedSystem === sys.key;
+    const rowsHtml = sys.rows.map(s => {
+      const w = round25(rm * s.pct / 100);
+      const wKg2 = state.unit === 'lbs' ? w / 2.205 : w;
+      const wtDisplay = state.trainingMode === 'bands'
+        ? `<span class="set-weight" style="color:${sys.color};font-size:11px;">${bandDots(wKg2)}${bandLabel(wKg2)}</span>`
         : `<span class="set-weight" style="color:${sys.color}">${fmt(w)} ${u}</span>`;
       return `<div class="system-set-row">
-        <span class="set-label">${label}</span>
-        <span class="set-reps">${s.reps} reps</span>
-        ${sysWtDisplay}
+        <span class="set-label">${s.label}</span>
+        <span class="set-reps">${s.reps}</span>
+        ${wtDisplay}
       </div>`;
     }).join('');
-    const selector    = sys.adjustable ? setsSelector(sys.setsAction, sys.setsCount, sys.color) : '';
-    const startSel    = sys.startSelector || '';
-    const hasControls = selector || startSel;
-    return `<div class="system-card">
+
+    const selStyle = sel
+      ? `border-color:${sys.color};background:rgba(${hexRgb(sys.color)},0.05);`
+      : '';
+    const badge = sel
+      ? `<div class="sys-check-badge" style="background:${sys.color};">✓</div>`
+      : '';
+
+    return `<div class="system-card selectable${sys.wide ? ' straight-card' : ''}"
+      style="position:relative;${selStyle}"
+      data-a="selectSystem" data-v="${sys.key}">
+      ${badge}
       <div class="system-card-header">
         <div class="system-color-bar" style="background:${sys.color}"></div>
-        <div style="flex:1;min-width:0;">
+        <div>
           <div class="system-name" style="color:${sys.color}">${sys.name}</div>
           <div class="system-desc">${sys.desc}</div>
-          ${hasControls ? `<div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">${selector}${startSel}</div>` : ''}
         </div>
       </div>
-      ${rows}
+      ${rowsHtml}
     </div>`;
   }).join('');
+
+  const hasSel = !!state.selectedSystem;
+  const btnLabel = hasSel ? 'GENERATE MY PROGRAMME →' : 'SELECT A TRAINING SYSTEM ABOVE ↑';
 
   return `
     <div class="back-link" data-a="recalc">← Recalculate</div>
@@ -2529,11 +2498,11 @@ function step6() {
       ${unifiedRows}
     </div>
     <div class="divider"></div>
-    <div class="section-heading">Your Numbers Across All Training Systems</div>
-    <div class="section-sub">${state.lift} · Based on estimated 1RM of ${fmt(rm)} ${u}</div>
-    <div class="systems-grid">${straightCard}${systemCards}</div>
-    <button class="calc-btn" data-a="genProg" style="margin-bottom:16px;">
-      📅 GENERATE MY NUMBERS TO PLAN MY TRAINING SESSIONS →
+    <div class="section-heading">Choose Your Training System</div>
+    <div class="section-sub">Tap the system Coach Nikos has prescribed for your current programme — then hit Generate to build your week-by-week plan.</div>
+    <div class="systems-grid">${cards}</div>
+    <button class="calc-btn" data-a="genProg" style="margin-bottom:16px;${hasSel ? '' : 'opacity:0.45;pointer-events:none;'}">
+      📅 ${btnLabel}
     </button>
     <div class="action-buttons">
       <button class="btn-print" data-a="print">🖨️ PRINT / SAVE PDF</button>
@@ -2541,22 +2510,25 @@ function step6() {
     </div>`;
 }
 
+
 // Step 7 — Week-by-week programme
 function step7() {
   const rm  = state.oneRM;
   const u   = state.unit;
-  const sys = state.selectedSystem;
+  const sys = state.selectedSystem || 'ascend';
   const inc = state.unit === 'kg' ? 2.5 : 5;
+  const n   = state.programWeeks;
 
-  const n = state.programWeeks;
-
-  const tabs = [
-    { key: 'ascend',   label: 'Ascend Pyramid' },
-    { key: 'reverse',  label: 'Reverse Pyramid' },
-    { key: '5x5',      label: '5x5 Strength Training' },
-    { key: 'cycle',    label: 'Percentage Training Cycle (PTC)' },
-    { key: 'straight', label: 'Straight Sets' },
-  ];
+  const sysNames = {
+    straight: 'Straight Sets', ascend: 'Ascend Pyramid',
+    reverse: 'Reverse Pyramid', '5x5': '5×5 Strength Training',
+    cycle: 'Percentage Training Cycle (PTC)',
+  };
+  const sysColors = {
+    straight: '#22c55e', ascend: '#f59e0b', reverse: '#8b5cf6',
+    '5x5': '#3b82f6', cycle: '#e74c3c',
+  };
+  const sysColor = sysColors[sys] || '#e74c3c';
 
   const straightRanges7 = {
     '6-8':   { low: 6,  high: 8,  pct: 85 },
@@ -2566,16 +2538,59 @@ function step7() {
   };
   const sr7 = straightRanges7[state.straightRange] || straightRanges7['10-12'];
 
-  const tabsHtml = tabs.map(t => `
-    <button class="prog-tab ${sys === t.key ? 'active' : ''}" data-a="selectSystem" data-v="${t.key}">
-      ${t.label}
-    </button>`).join('');
+  // ── Configurator (sets / range / start for adjustable systems) ──
+  function configurator() {
+    if (sys === '5x5' || sys === 'cycle') return '';
+    const setsAction   = sys === 'straight' ? 'setStraightSets' : sys === 'ascend' ? 'setAscendSets' : 'setReverseSets';
+    const currentSets  = sys === 'straight' ? state.straightSets : sys === 'ascend' ? state.ascendSets : state.reverseSets;
+    const setsBtns = [3,4,5].map(k => {
+      const active = currentSets === k;
+      return '<button class="sets-btn' + (active ? ' active' : '') + '" style="' +
+        (active ? 'border-color:' + sysColor + ';background:' + sysColor + ';' : '') +
+        '" data-a="' + setsAction + '" data-v="' + k + '">' + k + '</button>';
+    }).join('');
 
+    let extraRow = '';
+    if (sys === 'straight') {
+      const rangeBtns = Object.keys(straightRanges7).map(k => {
+        const active = state.straightRange === k;
+        return '<button class="range-btn' + (active ? ' active' : '') + '" data-a="selectStraightRange" data-v="' + k + '">' + k + ' reps</button>';
+      }).join('');
+      extraRow = '<div class="configurator-row"><span class="configurator-label">Rep Range</span><div style="display:flex;gap:8px;flex-wrap:wrap;">' + rangeBtns + '</div></div>';
+    } else {
+      const full  = sys === 'ascend'
+        ? [{reps:15},{reps:12},{reps:10},{reps:8},{reps:6}]
+        : [{reps:6},{reps:8},{reps:10},{reps:12},{reps:15}];
+      const maxStart     = full.length - currentSets;
+      const currentStart = sys === 'ascend' ? Math.min(state.ascendStartIdx, maxStart) : Math.min(state.reverseStartIdx, maxStart);
+      const startAction  = sys === 'ascend' ? 'setAscendStart' : 'setReverseStart';
+      if (maxStart > 0) {
+        const startBtns = Array.from({length: maxStart + 1}, (_, i) => {
+          const active = currentStart === i;
+          return '<button class="sets-btn' + (active ? ' active' : '') + '" style="width:auto;padding:0 10px;' +
+            (active ? 'border-color:' + sysColor + ';background:' + sysColor + ';' : '') +
+            '" data-a="' + startAction + '" data-v="' + i + '">' + full[i].reps + ' reps</button>';
+        }).join('');
+        extraRow = '<div class="configurator-row"><span class="configurator-label">Starting Reps</span><div style="display:flex;gap:8px;flex-wrap:wrap;">' + startBtns + '</div></div>';
+      }
+    }
+
+    return '<div class="configurator-card">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+        '<div style="width:4px;height:22px;background:' + sysColor + ';border-radius:2px;flex-shrink:0;"></div>' +
+        '<span style="font-size:12px;font-weight:800;color:#fff;letter-spacing:1.5px;text-transform:uppercase;">Configure — ' + sysNames[sys] + '</span>' +
+      '</div>' +
+      '<div class="configurator-row"><span class="configurator-label">Sets</span><div style="display:flex;gap:8px;">' + setsBtns + '</div></div>' +
+      extraRow +
+      '</div>';
+  }
+
+  // ── Build weeks ──
   let weeks = [];
 
   if (sys === 'ascend') {
     const fullA = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
-    const aS7 = Math.min(state.ascendStartIdx, fullA.length - state.ascendSets);
+    const aS7   = Math.min(state.ascendStartIdx, fullA.length - state.ascendSets);
     const base  = fullA.slice(aS7, aS7 + state.ascendSets);
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => ({
@@ -2589,7 +2604,7 @@ function step7() {
     }));
   } else if (sys === 'reverse') {
     const fullR = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
-    const rS7 = Math.min(state.reverseStartIdx, fullR.length - state.reverseSets);
+    const rS7   = Math.min(state.reverseStartIdx, fullR.length - state.reverseSets);
     const base  = fullR.slice(rS7, rS7 + state.reverseSets);
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => ({
@@ -2606,8 +2621,7 @@ function step7() {
     weeks = wkLabels.map((lbl, wi) => {
       const pct = Math.round((75 + (wi / Math.max(n - 1, 1)) * 15) * 2) / 2;
       return {
-        label: lbl,
-        note: `${pct}% 1RM`,
+        label: lbl, note: `${pct}% 1RM`,
         cls: wi >= n - 2 ? 'pw-red' : '',
         rows: Array.from({length: 5}, (_, si) => ({
           label: `Set ${si+1}`, reps: '5 reps',
@@ -2621,25 +2635,21 @@ function step7() {
     const phaseNotes = ['Build through the range', 'Aim for middle of range', 'Push to top of range ✅ → ready to progress'];
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => {
-      const phase    = Math.floor(wi / phaseLen);
+      const phase     = Math.floor(wi / phaseLen);
       const wkInPhase = wi % phaseLen;
-      const wgt      = baseWgt + inc * phase;
+      const wgt       = baseWgt + inc * phase;
       const isNewPhase = phase > 0 && wkInPhase === 0;
-      const note     = isNewPhase ? `Weight up +${inc}${u} — back to bottom of range` : phaseNotes[wkInPhase];
+      const note      = isNewPhase ? `Weight up +${inc}${u} — back to bottom of range` : phaseNotes[wkInPhase];
       return {
-        label: lbl,
-        note: note,
+        label: lbl, note,
         cls: wkInPhase === phaseLen - 1 ? 'pw-green' : (isNewPhase ? 'pw-red' : ''),
         rows: Array.from({length: state.straightSets}, (_, si) => ({
-          label: `Set ${si+1}`,
-          reps: `${sr7.low}–${sr7.high} reps`,
-          weight: wgt,
-          green: false,
+          label: `Set ${si+1}`, reps: `${sr7.low}–${sr7.high} reps`,
+          weight: wgt, green: false,
         })),
       };
     });
   } else {
-    // 6-week strength cycle
     weeks = program.map((w, i) => {
       const isLast = i === 5;
       const wgt    = round25(rm * w.pct / 100);
@@ -2650,8 +2660,7 @@ function step7() {
         rows: [{
           label: isLast ? 'Test' : `${w.sets} sets`,
           reps: isLast ? '1 rep max' : `${w.reps} reps`,
-          weight: wgt,
-          green: isLast,
+          weight: wgt, green: isLast,
           prefix: isLast ? 'Target ' : '',
           suffix: isLast ? '+' : '',
         }],
@@ -2659,30 +2668,23 @@ function step7() {
     });
   }
 
-  // Append deload week to every system
-  const deloadWeight = round25(rm * 0.5 / 100 * 100); // 50% 1RM
+  // Deload week
   const deloadRows = sys === 'ascend'
     ? [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}]
-        .map((s, si) => ({ label: `Set ${si+1}`, reps: `${s.reps} reps`, weight: round25(rm * 0.5 * s.pct / 100 * 2), green: true }))
+        .map((s, si) => ({ label:`Set ${si+1}`, reps:`${s.reps} reps`, weight:round25(rm*0.5*s.pct/100*2), green:true }))
     : sys === 'reverse'
     ? [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}]
-        .map((s, si) => ({ label: `Set ${si+1}`, reps: `${s.reps} reps`, weight: round25(rm * 0.5 * s.pct / 100 * 2), green: true }))
+        .map((s, si) => ({ label:`Set ${si+1}`, reps:`${s.reps} reps`, weight:round25(rm*0.5*s.pct/100*2), green:true }))
     : sys === '5x5'
-    ? Array.from({length: 5}, (_, si) => ({ label: `Set ${si+1}`, reps: '5 reps', weight: round25(rm * 0.5), green: true }))
+    ? Array.from({length:5}, (_,si) => ({ label:`Set ${si+1}`, reps:'5 reps', weight:round25(rm*0.5), green:true }))
     : sys === 'straight'
-    ? Array.from({length: state.straightSets}, (_, si) => ({ label: `Set ${si+1}`, reps: `${sr7.low}–${sr7.high} reps`, weight: round25(rm * 0.5), green: true }))
-    : [{ label: 'All Sets', reps: '5–10 reps', weight: round25(rm * 0.5), green: true, prefix: '', suffix: '' }];
+    ? Array.from({length:state.straightSets}, (_,si) => ({ label:`Set ${si+1}`, reps:`${sr7.low}–${sr7.high} reps`, weight:round25(rm*0.5), green:true }))
+    : [{ label:'All Sets', reps:'5–10 reps', weight:round25(rm*0.5), green:true, prefix:'', suffix:'' }];
 
-  weeks.push({
-    label: 'Deload Week 🟢',
-    note: '50% 1RM — Active Recovery',
-    cls: 'pw-green',
-    rows: deloadRows,
-  });
+  weeks.push({ label:'Deload Week 🟢', note:'50% 1RM — Active Recovery', cls:'pw-green', rows:deloadRows });
 
-  // Build plain-text copy string for phone notes
-  const sysName = tabs.find(t => t.key === sys)?.label || sys;
-  let copyText = `🏋️ ${state.lift.toUpperCase()} — ${sysName.toUpperCase()}\n`;
+  // Copy text
+  let copyText = `🏋️ ${state.lift.toUpperCase()} — ${(sysNames[sys]||sys).toUpperCase()}\n`;
   copyText += `Estimated 1RM: ${fmt(rm)} ${u}  |  ${n} Weeks + Deload\n`;
   if (state.programStartDate) {
     const progStart = new Date(state.programStartDate);
@@ -2693,13 +2695,13 @@ function step7() {
   }
   copyText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   weeks.forEach((wk, wi) => {
-    copyText += `WEEK ${wi + 1} — ${wk.label}`;
+    copyText += `WEEK ${wi+1} — ${wk.label}`;
     if (wk.note) copyText += ` (${wk.note})`;
     const dr = weekDateRange(wi);
     if (dr) copyText += `  📅 ${dr}`;
     copyText += `\n`;
     wk.rows.forEach(r => {
-      copyText += `  ${r.label}:  ${r.reps}  ·  ${r.prefix || ''}${fmt(r.weight)} ${u}${r.suffix || ''}\n`;
+      copyText += `  ${r.label}:  ${r.reps}  ·  ${r.prefix||''}${fmt(r.weight)} ${u}${r.suffix||''}\n`;
     });
     copyText += `\n`;
   });
@@ -2712,7 +2714,7 @@ function step7() {
       const wKg3 = state.unit === 'lbs' ? r.weight / 2.205 : r.weight;
       const progWt = state.trainingMode === 'bands' && !r.green
         ? `<span class="prog-set-weight">${bandDots(wKg3)}<br><span style="font-size:12px;">${bandLabel(wKg3)}</span></span>`
-        : `<span class="prog-set-weight ${r.green ? 'green' : ''}">${r.prefix || ''}${fmt(r.weight)} ${u}${r.suffix || ''}</span>`;
+        : `<span class="prog-set-weight ${r.green ? 'green' : ''}">${r.prefix||''}${fmt(r.weight)} ${u}${r.suffix||''}</span>`;
       return `<div class="prog-set-row">
         <span class="prog-set-label">${r.label}</span>
         <span class="prog-set-reps">${r.reps}</span>
@@ -2728,20 +2730,13 @@ function step7() {
     </div>`;
   }).join('');
 
-  const totalWeeks = 6;
-
   return `
     <div class="back-link" data-a="back">← Back to Systems</div>
     <h2 class="step-title" style="text-align:center;margin-bottom:6px;">${state.lift}</h2>
-    <p style="text-align:center;font-size:13px;font-weight:700;letter-spacing:3px;color:#e74c3c;text-transform:uppercase;margin-bottom:10px;">Your Estimated Progressive Overload Numbers</p>
-    <p style="text-align:center;font-size:13px;color:#555;margin-bottom:20px;">Estimated 1RM: <strong style="color:#888;">${fmt(rm)} ${u}</strong></p>
-    <div style="background:#141414;border:1px solid #242424;border-radius:14px;padding:20px 24px;margin-bottom:28px;">
-      <p style="font-size:14px;color:#888;line-height:1.7;text-align:center;">
-        Select the training system below based on what Coach Nikos has prescribed on your current programme. Follow these numbers consistently over the next few weeks to ensure we stay on track and hit your targets.
-      </p>
-    </div>
+    <p style="text-align:center;font-size:13px;font-weight:700;letter-spacing:3px;color:${sysColor};text-transform:uppercase;margin-bottom:10px;">${sysNames[sys]||sys}</p>
+    <p style="text-align:center;font-size:13px;color:#555;margin-bottom:28px;">Estimated 1RM: <strong style="color:#888;">${fmt(rm)} ${u}</strong></p>
     <div class="weeks-picker">
-      <p class="weeks-picker-label"><strong>How many weeks is your current programme?</strong><br>We'll customise every training system to match your programme length.</p>
+      <p class="weeks-picker-label"><strong>How many weeks is your current programme?</strong><br>We'll customise the progression to match your programme length.</p>
       <div class="weeks-picker-controls">
         <button class="weeks-btn" data-a="decrWeeks">−</button>
         <div>
@@ -2752,7 +2747,7 @@ function step7() {
       </div>
       <p class="weeks-picker-note">Min 2 weeks · Max 12 weeks · + Deload week included</p>
       <div class="dates-toggle" data-a="toggleDates">
-        <span class="dates-toggle-icon">${state.showDates ? '📅' : '📅'}</span>
+        <span class="dates-toggle-icon">📅</span>
         <span class="dates-toggle-text">${state.showDates ? 'Hide programme dates' : 'Add programme dates'}</span>
         <em>optional</em>
       </div>
@@ -2772,11 +2767,11 @@ function step7() {
         </div>
       </div>` : ''}
     </div>
-    <div class="prog-tabs">${tabsHtml}</div>
+    ${configurator()}
     ${weeksHtml}
     <div class="copy-notes-card">
       <div class="copy-notes-title">📋 Save to Your Phone Notes</div>
-      <p class="copy-notes-sub">Tap the button below to copy your full programme as plain text — then paste it straight into your Notes app. No printing, no downloading.</p>
+      <p class="copy-notes-sub">Tap the button below to copy your full programme as plain text — then paste it straight into your Notes app.</p>
       <div class="copy-preview">${copyText}</div>
       <button class="btn-copy" id="copyBtn" data-a="copyProg">📋 COPY PROGRAMME TO CLIPBOARD →</button>
     </div>
@@ -2785,6 +2780,7 @@ function step7() {
       <button class="btn-new" data-a="restart">+ NEW LIFT</button>
     </div>`;
 }
+
 
 // ── Events ─────────────────────────────────────────────
 function wireEvents() {
@@ -2874,7 +2870,6 @@ function onAction(e) {
       state.directEntry = false; state.selectedBands = []; state.bandReps = ''; break;
 
     case 'genProg':
-      state.selectedSystem = 'ascend';
       state.step = 7; break;
 
     case 'selectSystem':
@@ -2898,7 +2893,7 @@ function onAction(e) {
       Object.assign(state, {
         step: 1, bodyArea: null, movement: null, type: null, lift: null,
         unit: 'kg', sets: '', reps: '', weight: '', oneRM: null,
-        directEntry: false, selectedSystem: 'ascend', programWeeks: 6,
+        directEntry: false, selectedSystem: null, programWeeks: 6,
         inLibrary: false, libraryCategory: null,
         trainingMode: null, selectedBands: [], bandReps: '',
         straightRange: '10-12', ascendSets: 5, ascendStartIdx: 0, reverseSets: 5, reverseStartIdx: 0, straightSets: 4,
