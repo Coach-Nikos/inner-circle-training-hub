@@ -1276,6 +1276,68 @@
     .band-dot { width: 28px; height: 28px; }
   }
 
+  /* ── Training mode choice cards ── */
+  .mode-choice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 28px;
+  }
+
+  .mode-choice-card {
+    background: rgba(255,255,255,0.03);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 32px 20px 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    user-select: none;
+  }
+
+  .mode-choice-card:hover {
+    border-color: #e74c3c;
+    background: rgba(231,76,60,0.07);
+    transform: translateY(-2px);
+  }
+
+  .mode-choice-card:active { transform: scale(0.97); }
+
+  .mode-choice-icon { font-size: 40px; margin-bottom: 14px; }
+
+  .mode-choice-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .mode-choice-sub {
+    font-size: 12px;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  .switch-mode-link {
+    text-align: center;
+    font-size: 13px;
+    color: #555;
+    cursor: pointer;
+    margin: 16px 0 8px;
+    transition: color 0.2s;
+  }
+
+  .switch-mode-link:hover { color: #e74c3c; }
+
+  @media (max-width: 480px) {
+    .mode-choice-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .mode-choice-card { padding: 24px 12px 20px; }
+    .mode-choice-icon { font-size: 32px; margin-bottom: 10px; }
+    .mode-choice-title { font-size: 12px; }
+  }
+
 </style>
 </head>
 <body>
@@ -1316,6 +1378,7 @@ const state = {
   inLibrary: false,
   libraryCategory: null,
   bandMode: false,
+  trainingMode: null,
   selectedBands: [],
   bandReps: '',
 };
@@ -1831,8 +1894,30 @@ function step5() {
     '<div class="yt-demo-sub">' + state.lift + ' — technique &amp; form tutorials on YouTube</div>' +
     '</div><div class="yt-demo-arrow">→</div></a>';
 
+  const header = '<div class="back-link" data-a="back">← Back</div>' +
+    '<h2 class="step-title">' + state.lift + '</h2>' +
+    demoHtml;
+
+  // ── MODE SELECTION (no training mode chosen yet) ───────
+  if (!state.trainingMode) {
+    return header +
+      '<p class="step-subtitle" style="margin-top:20px;">How are you training for this lift?</p>' +
+      '<div class="mode-choice-grid">' +
+        '<div class="mode-choice-card" data-a="selectTrainingMode" data-v="gym">' +
+          '<div class="mode-choice-icon">🏋️</div>' +
+          '<div class="mode-choice-title">Gym / Free Weights</div>' +
+          '<div class="mode-choice-sub">Barbells, dumbbells or machines</div>' +
+        '</div>' +
+        '<div class="mode-choice-card" data-a="selectTrainingMode" data-v="bands">' +
+          '<div class="mode-choice-icon">🏠</div>' +
+          '<div class="mode-choice-title">Home / Resistance Bands</div>' +
+          '<div class="mode-choice-sub">Training with resistance bands</div>' +
+        '</div>' +
+      '</div>';
+  }
+
   // ── BAND MODE ──────────────────────────────────────────
-  if (state.bandMode) {
+  if (state.trainingMode === 'bands') {
     const totalKg  = state.selectedBands.reduce((s, id) => { const b = BANDS.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
     const totalLbs = Math.round(totalKg * 2.205);
     const circles  = BANDS.map(b => {
@@ -1845,10 +1930,8 @@ function step5() {
         '</div>';
     }).join('');
 
-    return '<div class="back-link" data-a="back">← Back</div>' +
-      '<h2 class="step-title">' + state.lift + '</h2>' +
-      '<p class="step-subtitle">Select the resistance bands you\'re using and enter your reps — we\'ll calculate your estimated 1RM and show you exactly which band combinations to use for every set and every week of your programme.</p>' +
-      demoHtml +
+    return header +
+      '<p class="step-subtitle" style="margin-top:20px;">Select the resistance bands you\'re using and enter your reps — we\'ll calculate your estimated 1RM and show you exactly which band combinations to use for every set and every week of your programme.</p>' +
       '<div class="input-card">' +
         '<div class="input-label">Select Your Resistance Bands</div>' +
         '<p style="font-size:13px;color:#555;margin-bottom:20px;line-height:1.6;">Tap each band you\'re using — you can combine multiple bands. The resistance adds up automatically.</p>' +
@@ -1863,20 +1946,15 @@ function step5() {
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="or-divider">OR</div>' +
-      '<div class="direct-link" data-a="toggleBandMode">' +
-        '<span class="direct-link-text"><strong>Using gym equipment?</strong> Switch back to standard weight input.</span>' +
-        '<a>Switch →</a>' +
-      '</div>' +
+      '<div class="switch-mode-link" data-a="selectTrainingMode" data-v="">← Switch to gym / free weights</div>' +
       '<button class="calc-btn" data-a="calculateBands">CALCULATE MY BAND PROGRESSION →</button>' +
       '<p class="err-msg" id="errMsg"></p>';
   }
 
+  // ── GYM: DIRECT 1RM ENTRY ─────────────────────────────
   if (state.directEntry) {
-    return '<div class="back-link" data-a="back">← Back</div>' +
-      '<h2 class="step-title">' + state.lift + '</h2>' +
-      '<p class="step-subtitle">Enter your known 1 Rep Max and we\'ll calculate your precise training loads across every rep range and training system.</p>' +
-      demoHtml +
+    return header +
+      '<p class="step-subtitle" style="margin-top:20px;">Enter your known 1 Rep Max and we\'ll calculate your precise training loads across every rep range and training system.</p>' +
       '<div class="input-card">' +
         '<div class="input-label">Weight Unit</div>' +
         '<div class="unit-toggle">' +
@@ -1896,10 +1974,10 @@ function step5() {
       '<button class="calc-btn" data-a="calcDirect">CALCULATE MY ESTIMATED REPS &amp; WEIGHTS →</button>' +
       '<p class="err-msg" id="errMsg"></p>';
   }
-  return '<div class="back-link" data-a="back">← Back</div>' +
-    '<h2 class="step-title">' + state.lift + '</h2>' +
-    '<p class="step-subtitle">Enter what you\'re currently lifting in terms of reps and weight. We\'ll use this to estimate your 1 Rep Max and calculate the precise training loads you should be working with across every rep range and training system.</p>' +
-    demoHtml +
+
+  // ── GYM: STANDARD REPS + WEIGHT ───────────────────────
+  return header +
+    '<p class="step-subtitle" style="margin-top:20px;">Enter what you\'re currently lifting in terms of reps and weight. We\'ll use this to estimate your 1 Rep Max and calculate the precise training loads you should be working with across every rep range and training system.</p>' +
     '<div class="input-card">' +
       '<div class="input-label">Weight Unit</div>' +
       '<div class="unit-toggle">' +
@@ -1920,8 +1998,6 @@ function step5() {
     '</div>' +
     '<div class="or-divider">OR</div>' +
     '<div class="direct-link" data-a="toggleDirect"><span class="direct-link-text"><strong>Already know your 1RM?</strong> Enter it directly to skip the calculation.</span><a>Enter directly →</a></div>' +
-    '<div class="or-divider">OR</div>' +
-    '<div class="direct-link" data-a="toggleBandMode"><span class="direct-link-text"><strong>🏠 Training from home?</strong> Use resistance bands instead of weights.</span><a>Band mode →</a></div>' +
     '<button class="calc-btn" data-a="calculate">CALCULATE MY ESTIMATED REPS &amp; WEIGHTS →</button>' +
     '<p class="err-msg" id="errMsg"></p>';
 }
@@ -1949,14 +2025,14 @@ function step6() {
     const w = round25(rm * z.pct / 100);
     const repsLabel = z.reps === 1 ? '1 rep' : `${z.reps} reps`;
     const wKg = state.unit === 'lbs' ? w / 2.205 : w;
-    const weightDisplay = state.bandMode
+    const weightDisplay = state.trainingMode === 'bands'
       ? `<div style="font-size:11px;color:#aaa;line-height:1.5;">${bandDots(wKg)}${bandLabel(wKg)}</div>`
       : `${fmt(w)} ${u}`;
     return `<div class="zone-row">
       <div class="zone-dot" style="background:${z.color}"></div>
       <div class="zone-pct" style="color:${z.color}">${z.pct}%</div>
       <div class="zone-reps">${repsLabel}</div>
-      <div class="zone-weight" style="${state.bandMode?'min-width:160px;':''}">${weightDisplay}</div>
+      <div class="zone-weight" style="${state.trainingMode === 'bands'?'min-width:160px;':''}">${weightDisplay}</div>
       <div class="zone-name">${z.name}</div>
     </div>`;
   }).join('');
@@ -1994,7 +2070,7 @@ function step6() {
       const w     = round25(rm * s.pct / 100);
       const label = sys.key === 'cycle' ? s.label : `Set ${i+1}`;
       const wKg2  = state.unit === 'lbs' ? w / 2.205 : w;
-      const sysWtDisplay = state.bandMode
+      const sysWtDisplay = state.trainingMode === 'bands'
         ? `<span class="set-weight" style="color:${sys.color};font-size:11px;text-align:right;">${bandDots(wKg2)}${bandLabel(wKg2)}</span>`
         : `<span class="set-weight" style="color:${sys.color}">${fmt(w)} ${u}</span>`;
       return `<div class="system-set-row">
@@ -2163,7 +2239,7 @@ function step7() {
   const weeksHtml = weeks.map((wk, wi) => {
     const rowsHtml = wk.rows.map(r => {
       const wKg3 = state.unit === 'lbs' ? r.weight / 2.205 : r.weight;
-      const progWt = state.bandMode && !r.green
+      const progWt = state.trainingMode === 'bands' && !r.green
         ? `<span class="prog-set-weight">${bandDots(wKg3)}<br><span style="font-size:12px;">${bandLabel(wKg3)}</span></span>`
         : `<span class="prog-set-weight ${r.green ? 'green' : ''}">${r.prefix || ''}${fmt(r.weight)} ${u}${r.suffix || ''}</span>`;
       return `<div class="prog-set-row">
@@ -2259,7 +2335,7 @@ function onAction(e) {
       state.type = v; state.step = 4; break;
 
     case 'lift':
-      state.lift = v; state.directEntry = false;
+      state.lift = v; state.directEntry = false; state.trainingMode = null;
       state.sets = ''; state.reps = ''; state.weight = '';
       state.step = 5; break;
 
@@ -2288,6 +2364,11 @@ function onAction(e) {
     }
 
     case 'back':
+      if (state.step === 5 && state.trainingMode) {
+        state.trainingMode = null; state.directEntry = false;
+        state.selectedBands = []; state.bandReps = '';
+        render(); return;
+      }
       if (state.step > 1) {
         state.step--;
         state.directEntry = false;
@@ -2295,9 +2376,9 @@ function onAction(e) {
       break;
 
     case 'recalc':
-      state.step = 5;
+      state.step = 5; state.trainingMode = null;
       state.sets = ''; state.reps = ''; state.weight = '';
-      state.directEntry = false; state.bandMode = false; state.selectedBands = []; state.bandReps = ''; break;
+      state.directEntry = false; state.selectedBands = []; state.bandReps = ''; break;
 
     case 'genProg':
       state.selectedSystem = 'ascend';
@@ -2321,11 +2402,11 @@ function onAction(e) {
         unit: 'kg', sets: '', reps: '', weight: '', oneRM: null,
         directEntry: false, selectedSystem: 'ascend', programWeeks: 6,
         inLibrary: false, libraryCategory: null,
-        bandMode: false, selectedBands: [], bandReps: ''
+        trainingMode: null, selectedBands: [], bandReps: ''
       }); break;
 
-    case 'toggleBandMode':
-      state.bandMode = !state.bandMode;
+    case 'selectTrainingMode':
+      state.trainingMode = v || null;
       state.selectedBands = []; state.bandReps = '';
       state.directEntry = false; render(); return;
 
