@@ -1206,6 +1206,76 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+
+  /* ── Resistance Bands ── */
+  .band-selector {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .band-circle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 10px;
+    border-radius: 14px;
+    border: 2px solid #2a2a2a;
+    background: #161616;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    min-width: 66px;
+    position: relative;
+  }
+
+  .band-circle:hover { border-color: #555; background: #1e1e1e; }
+  .band-circle.sel   { border-color: #e74c3c; background: rgba(231,76,60,0.12); }
+
+  .band-dot {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,255,255,0.08);
+  }
+
+  .band-cname { font-size: 11px; font-weight: 700; color: #ccc; letter-spacing: 0.5px; }
+  .band-ckg   { font-size: 10px; color: #555; }
+
+  .band-check {
+    position: absolute; top: 5px; right: 7px;
+    font-size: 11px; color: #e74c3c; font-weight: 900;
+  }
+
+  .band-total {
+    text-align: center;
+    padding: 14px;
+    background: #111;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #888;
+    margin-top: 8px;
+    margin-bottom: 4px;
+  }
+  .band-total strong { color: #e74c3c; font-size: 20px; }
+
+  .band-combo-label {
+    font-size: 11px;
+    color: #555;
+    margin-top: 3px;
+    line-height: 1.5;
+    letter-spacing: 0.3px;
+  }
+
+  @media (max-width: 600px) {
+    .band-circle { min-width: 58px; padding: 12px 8px; }
+    .band-dot { width: 28px; height: 28px; }
+  }
+
 </style>
 </head>
 <body>
@@ -1245,6 +1315,9 @@ const state = {
   programWeeks: 6,
   inLibrary: false,
   libraryCategory: null,
+  bandMode: false,
+  selectedBands: [],
+  bandReps: '',
 };
 
 // ── Data ───────────────────────────────────────────────
@@ -1298,6 +1371,16 @@ const program = [
   { sets: 5, reps: 5,  pct: 85, name: 'Strength Focus',         cls: 'hl-red' },
   { sets: 5, reps: 3,  pct: 90, name: 'Peaking Intensity',      cls: 'hl-red' },
   { sets: null, reps: null, pct: 100, name: 'Test Your 1RM 🏆', cls: 'hl-green' },
+];
+
+
+// ── Resistance Bands ───────────────────────────────────
+const BANDS = [
+  { id: 'yellow', name: 'Yellow', kg: 2,  lbs: 5,  color: '#eab308', label: 'Extra Light' },
+  { id: 'green',  name: 'Green',  kg: 5,  lbs: 12, color: '#22c55e', label: 'Light'       },
+  { id: 'blue',   name: 'Blue',   kg: 9,  lbs: 20, color: '#3b82f6', label: 'Medium'      },
+  { id: 'red',    name: 'Red',    kg: 14, lbs: 30, color: '#ef4444', label: 'Heavy'       },
+  { id: 'black',  name: 'Black',  kg: 18, lbs: 40, color: '#1f2937', label: 'Extra Heavy' },
 ];
 
 // ── Exercise Demo — dynamic fetch from wger.de open API ──
@@ -1452,6 +1535,31 @@ const videoLibrary = [
 // ── Helpers ────────────────────────────────────────────
 function round25(v) { return Math.round(v / 2.5) * 2.5; }
 function fmt(v) { return v % 1 === 0 ? String(v) : v.toFixed(1); }
+
+
+// Find closest band combination for a target kg weight (brute-force 2^5 combos)
+function findBandCombo(targetKg) {
+  let best = null, bestDiff = Infinity;
+  for (let mask = 1; mask < 32; mask++) {
+    const combo = BANDS.filter((_, i) => mask & (1 << i));
+    const total = combo.reduce((s, b) => s + b.kg, 0);
+    const diff  = Math.abs(total - targetKg);
+    if (diff < bestDiff || (diff === bestDiff && best && combo.length < best.combo.length)) {
+      bestDiff = diff; best = { combo, total };
+    }
+  }
+  return best || { combo: [BANDS[4]], total: BANDS[4].kg };
+}
+
+function bandLabel(weightKg) {
+  const { combo, total } = findBandCombo(weightKg);
+  return combo.map(b => b.name).join(' + ') + ' (' + total + ' kg)';
+}
+
+function bandDots(weightKg) {
+  const { combo } = findBandCombo(weightKg);
+  return combo.map(b => '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + b.color + ';margin-right:3px;vertical-align:middle;"></span>').join('');
+}
 
 // Epley 1RM formula
 function epley(w, r) { return round25(w * (1 + r / 30)); }
@@ -1714,76 +1822,108 @@ function step4() {
 // Step 5 — Enter stats
 function step5() {
   const u = state.unit.toUpperCase();
-  const ytQuery = encodeURIComponent(`how to ${state.lift} exercise tutorial`);
-  const ytUrl   = `https://www.youtube.com/results?search_query=${ytQuery}`;
-  const demoHtml = `
-    <a class="yt-demo-btn" href="${ytUrl}" target="_blank" rel="noopener">
-      <div class="yt-demo-icon">▶</div>
-      <div class="yt-demo-text">
-        <div class="yt-demo-title">Watch Exercise Demo</div>
-        <div class="yt-demo-sub">${state.lift} — technique &amp; form tutorials on YouTube</div>
-      </div>
-      <div class="yt-demo-arrow">→</div>
-    </a>`;
+  const ytQuery = encodeURIComponent('how to ' + state.lift + ' exercise tutorial');
+  const ytUrl   = 'https://www.youtube.com/results?search_query=' + ytQuery;
+  const demoHtml = '<a class="yt-demo-btn" href="' + ytUrl + '" target="_blank" rel="noopener">' +
+    '<div class="yt-demo-icon">▶</div>' +
+    '<div class="yt-demo-text">' +
+    '<div class="yt-demo-title">Watch Exercise Demo</div>' +
+    '<div class="yt-demo-sub">' + state.lift + ' — technique &amp; form tutorials on YouTube</div>' +
+    '</div><div class="yt-demo-arrow">→</div></a>';
+
+  // ── BAND MODE ──────────────────────────────────────────
+  if (state.bandMode) {
+    const totalKg  = state.selectedBands.reduce((s, id) => { const b = BANDS.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
+    const totalLbs = Math.round(totalKg * 2.205);
+    const circles  = BANDS.map(b => {
+      const sel = state.selectedBands.includes(b.id);
+      return '<div class="band-circle ' + (sel ? 'sel' : '') + '" data-a="toggleBand" data-v="' + b.id + '">' +
+        '<div class="band-dot" style="background:' + b.color + '"></div>' +
+        '<div class="band-cname">' + b.name + '</div>' +
+        '<div class="band-ckg">' + b.kg + ' kg</div>' +
+        (sel ? '<div class="band-check">✓</div>' : '') +
+        '</div>';
+    }).join('');
+
+    return '<div class="back-link" data-a="back">← Back</div>' +
+      '<h2 class="step-title">' + state.lift + '</h2>' +
+      '<p class="step-subtitle">Select the resistance bands you're using and enter your reps — we'll calculate your estimated 1RM and show you exactly which band combinations to use for every set and every week of your programme.</p>' +
+      demoHtml +
+      '<div class="input-card">' +
+        '<div class="input-label">Select Your Resistance Bands</div>' +
+        '<p style="font-size:13px;color:#555;margin-bottom:20px;line-height:1.6;">Tap each band you're using — you can combine multiple bands. The resistance adds up automatically.</p>' +
+        '<div class="band-selector">' + circles + '</div>' +
+        (totalKg > 0 ?
+          '<div class="band-total">Total Resistance: <strong>' + totalKg + ' kg</strong> <span style="color:#555;font-size:13px;">(~' + totalLbs + ' lbs)</span></div>' : '') +
+        '<div class="input-label" style="margin-top:24px;">How Many Reps Can You Do With These Bands?</div>' +
+        '<div class="inputs-row" style="grid-template-columns:1fr;">' +
+          '<div class="input-group">' +
+            '<input class="num-input" id="iBandReps" type="number" placeholder="10" value="' + state.bandReps + '" min="1" max="30">' +
+            '<span class="input-unit-label">Reps</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="or-divider">OR</div>' +
+      '<div class="direct-link" data-a="toggleBandMode">' +
+        '<span class="direct-link-text"><strong>Using gym equipment?</strong> Switch back to standard weight input.</span>' +
+        '<a>Switch →</a>' +
+      '</div>' +
+      '<button class="calc-btn" data-a="calculateBands">CALCULATE MY BAND PROGRESSION →</button>' +
+      '<p class="err-msg" id="errMsg"></p>';
+  }
 
   if (state.directEntry) {
-    return `
-      <div class="back-link" data-a="back">← Back</div>
-      <h2 class="step-title">${state.lift}</h2>
-      <p class="step-subtitle">Enter your known 1 Rep Max and we'll calculate your precise training loads across every rep range and training system.</p>
-      ${demoHtml}
-      <div class="input-card">
-        <div class="input-label">Weight Unit</div>
-        <div class="unit-toggle">
-          <button class="unit-btn ${state.unit==='kg'?'active':''}" data-a="unit" data-v="kg">KG</button>
-          <button class="unit-btn ${state.unit==='lbs'?'active':''}" data-a="unit" data-v="lbs">LBS</button>
-        </div>
-        <div class="input-label">Your 1RM</div>
-        <div class="inputs-row" style="grid-template-columns:1fr;">
-          <div class="input-group">
-            <input class="num-input" id="iDirect" type="number" placeholder="100" value="${state.weight}">
-            <span class="input-unit-label">${u}</span>
-          </div>
-        </div>
-      </div>
-      <div class="or-divider">OR</div>
-      <div class="direct-link" data-a="toggleDirect">
-        <span class="direct-link-text"><strong>Prefer sets &amp; reps?</strong> Calculate from your working weight instead.</span>
-        <a>Switch →</a>
-      </div>
-      <button class="calc-btn" data-a="calcDirect">CALCULATE MY ESTIMATED REPS &amp; WEIGHTS →</button>
-      <p class="err-msg" id="errMsg"></p>`;
+    return '<div class="back-link" data-a="back">← Back</div>' +
+      '<h2 class="step-title">' + state.lift + '</h2>' +
+      '<p class="step-subtitle">Enter your known 1 Rep Max and we'll calculate your precise training loads across every rep range and training system.</p>' +
+      demoHtml +
+      '<div class="input-card">' +
+        '<div class="input-label">Weight Unit</div>' +
+        '<div class="unit-toggle">' +
+          '<button class="unit-btn ' + (state.unit==='kg'?'active':'') + '" data-a="unit" data-v="kg">KG</button>' +
+          '<button class="unit-btn ' + (state.unit==='lbs'?'active':'') + '" data-a="unit" data-v="lbs">LBS</button>' +
+        '</div>' +
+        '<div class="input-label">Your 1RM</div>' +
+        '<div class="inputs-row" style="grid-template-columns:1fr;">' +
+          '<div class="input-group">' +
+            '<input class="num-input" id="iDirect" type="number" placeholder="100" value="' + state.weight + '">' +
+            '<span class="input-unit-label">' + u + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="or-divider">OR</div>' +
+      '<div class="direct-link" data-a="toggleDirect"><span class="direct-link-text"><strong>Prefer sets &amp; reps?</strong> Calculate from your working weight instead.</span><a>Switch →</a></div>' +
+      '<button class="calc-btn" data-a="calcDirect">CALCULATE MY ESTIMATED REPS &amp; WEIGHTS →</button>' +
+      '<p class="err-msg" id="errMsg"></p>';
   }
-  return `
-    <div class="back-link" data-a="back">← Back</div>
-    <h2 class="step-title">${state.lift}</h2>
-    <p class="step-subtitle">Enter what you're currently lifting in terms of reps and weight. We'll use this to estimate your 1 Rep Max and calculate the precise training loads you should be working with across every rep range and training system.</p>
-    ${demoHtml}
-    <div class="input-card">
-      <div class="input-label">Weight Unit</div>
-      <div class="unit-toggle">
-        <button class="unit-btn ${state.unit==='kg'?'active':''}" data-a="unit" data-v="kg">KG</button>
-        <button class="unit-btn ${state.unit==='lbs'?'active':''}" data-a="unit" data-v="lbs">LBS</button>
-      </div>
-      <div class="input-label">What are you currently lifting?</div>
-      <div class="inputs-row" style="grid-template-columns:1fr 1fr;">
-        <div class="input-group">
-          <input class="num-input" id="iReps" type="number" placeholder="10" value="${state.reps}" min="1" max="30">
-          <span class="input-unit-label">Reps</span>
-        </div>
-        <div class="input-group">
-          <input class="num-input" id="iWeight" type="number" placeholder="60" value="${state.weight}" min="1">
-          <span class="input-unit-label">${u}</span>
-        </div>
-      </div>
-    </div>
-    <div class="or-divider">OR</div>
-    <div class="direct-link" data-a="toggleDirect">
-      <span class="direct-link-text"><strong>Already know your 1RM?</strong> Enter it directly to skip the calculation.</span>
-      <a>Enter directly →</a>
-    </div>
-    <button class="calc-btn" data-a="calculate">CALCULATE MY ESTIMATED REPS &amp; WEIGHTS →</button>
-    <p class="err-msg" id="errMsg"></p>`;
+  return '<div class="back-link" data-a="back">← Back</div>' +
+    '<h2 class="step-title">' + state.lift + '</h2>' +
+    '<p class="step-subtitle">Enter what you're currently lifting in terms of reps and weight. We'll use this to estimate your 1 Rep Max and calculate the precise training loads you should be working with across every rep range and training system.</p>' +
+    demoHtml +
+    '<div class="input-card">' +
+      '<div class="input-label">Weight Unit</div>' +
+      '<div class="unit-toggle">' +
+        '<button class="unit-btn ' + (state.unit==='kg'?'active':'') + '" data-a="unit" data-v="kg">KG</button>' +
+        '<button class="unit-btn ' + (state.unit==='lbs'?'active':'') + '" data-a="unit" data-v="lbs">LBS</button>' +
+      '</div>' +
+      '<div class="input-label">What are you currently lifting?</div>' +
+      '<div class="inputs-row" style="grid-template-columns:1fr 1fr;">' +
+        '<div class="input-group">' +
+          '<input class="num-input" id="iReps" type="number" placeholder="10" value="' + state.reps + '" min="1" max="30">' +
+          '<span class="input-unit-label">Reps</span>' +
+        '</div>' +
+        '<div class="input-group">' +
+          '<input class="num-input" id="iWeight" type="number" placeholder="60" value="' + state.weight + '" min="1">' +
+          '<span class="input-unit-label">' + u + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="or-divider">OR</div>' +
+    '<div class="direct-link" data-a="toggleDirect"><span class="direct-link-text"><strong>Already know your 1RM?</strong> Enter it directly to skip the calculation.</span><a>Enter directly →</a></div>' +
+    '<div class="or-divider">OR</div>' +
+    '<div class="direct-link" data-a="toggleBandMode"><span class="direct-link-text"><strong>🏠 Training from home?</strong> Use resistance bands instead of weights.</span><a>Band mode →</a></div>' +
+    '<button class="calc-btn" data-a="calculate">CALCULATE MY ESTIMATED REPS &amp; WEIGHTS →</button>' +
+    '<p class="err-msg" id="errMsg"></p>';
 }
 
 // Step 6 — Training systems dashboard
@@ -1808,11 +1948,15 @@ function step6() {
   const unifiedRows = unifiedZones.map(z => {
     const w = round25(rm * z.pct / 100);
     const repsLabel = z.reps === 1 ? '1 rep' : `${z.reps} reps`;
+    const wKg = state.unit === 'lbs' ? w / 2.205 : w;
+    const weightDisplay = state.bandMode
+      ? `<div style="font-size:11px;color:#aaa;line-height:1.5;">${bandDots(wKg)}${bandLabel(wKg)}</div>`
+      : `${fmt(w)} ${u}`;
     return `<div class="zone-row">
       <div class="zone-dot" style="background:${z.color}"></div>
       <div class="zone-pct" style="color:${z.color}">${z.pct}%</div>
       <div class="zone-reps">${repsLabel}</div>
-      <div class="zone-weight">${fmt(w)} ${u}</div>
+      <div class="zone-weight" style="${state.bandMode?'min-width:160px;':''}">${weightDisplay}</div>
       <div class="zone-name">${z.name}</div>
     </div>`;
   }).join('');
@@ -1849,10 +1993,14 @@ function step6() {
     const rows = sys.sets.map((s, i) => {
       const w     = round25(rm * s.pct / 100);
       const label = sys.key === 'cycle' ? s.label : `Set ${i+1}`;
+      const wKg2  = state.unit === 'lbs' ? w / 2.205 : w;
+      const sysWtDisplay = state.bandMode
+        ? `<span class="set-weight" style="color:${sys.color};font-size:11px;text-align:right;">${bandDots(wKg2)}${bandLabel(wKg2)}</span>`
+        : `<span class="set-weight" style="color:${sys.color}">${fmt(w)} ${u}</span>`;
       return `<div class="system-set-row">
         <span class="set-label">${label}</span>
         <span class="set-reps">${s.reps} reps</span>
-        <span class="set-weight" style="color:${sys.color}">${fmt(w)} ${u}</span>
+        ${sysWtDisplay}
       </div>`;
     }).join('');
     return `<div class="system-card">
@@ -2013,12 +2161,17 @@ function step7() {
   window._progCopyText = copyText;
 
   const weeksHtml = weeks.map((wk, wi) => {
-    const rowsHtml = wk.rows.map(r => `
-      <div class="prog-set-row">
+    const rowsHtml = wk.rows.map(r => {
+      const wKg3 = state.unit === 'lbs' ? r.weight / 2.205 : r.weight;
+      const progWt = state.bandMode && !r.green
+        ? `<span class="prog-set-weight">${bandDots(wKg3)}<br><span style="font-size:12px;">${bandLabel(wKg3)}</span></span>`
+        : `<span class="prog-set-weight ${r.green ? 'green' : ''}">${r.prefix || ''}${fmt(r.weight)} ${u}${r.suffix || ''}</span>`;
+      return `<div class="prog-set-row">
         <span class="prog-set-label">${r.label}</span>
         <span class="prog-set-reps">${r.reps}</span>
-        <span class="prog-set-weight ${r.green ? 'green' : ''}">${r.prefix || ''}${fmt(r.weight)} ${u}${r.suffix || ''}</span>
-      </div>`).join('');
+        ${progWt}
+      </div>`;
+    }).join('');
     return `<div class="prog-week ${wk.cls}">
       <div class="prog-week-header">
         <span class="prog-week-num">Week ${wi+1}</span>
@@ -2081,6 +2234,8 @@ function wireEvents() {
   if (w)  w.addEventListener('input',  e => { state.weight = e.target.value; });
   if (d)  d.addEventListener('input',  e => { state.weight = e.target.value; });
   if (sx) sx.addEventListener('input', handleSearch);
+  const br = document.getElementById('iBandReps');
+  if (br) br.addEventListener('input', e => { state.bandReps = e.target.value; });
 }
 
 function showErr(msg) {
@@ -2142,7 +2297,7 @@ function onAction(e) {
     case 'recalc':
       state.step = 5;
       state.sets = ''; state.reps = ''; state.weight = '';
-      state.directEntry = false; break;
+      state.directEntry = false; state.bandMode = false; state.selectedBands = []; state.bandReps = ''; break;
 
     case 'genProg':
       state.selectedSystem = 'ascend';
@@ -2165,8 +2320,30 @@ function onAction(e) {
         step: 1, bodyArea: null, movement: null, type: null, lift: null,
         unit: 'kg', sets: '', reps: '', weight: '', oneRM: null,
         directEntry: false, selectedSystem: 'ascend', programWeeks: 6,
-        inLibrary: false, libraryCategory: null
+        inLibrary: false, libraryCategory: null,
+        bandMode: false, selectedBands: [], bandReps: ''
       }); break;
+
+    case 'toggleBandMode':
+      state.bandMode = !state.bandMode;
+      state.selectedBands = []; state.bandReps = '';
+      state.directEntry = false; render(); return;
+
+    case 'toggleBand': {
+      const idx = state.selectedBands.indexOf(v);
+      if (idx > -1) state.selectedBands.splice(idx, 1);
+      else state.selectedBands.push(v);
+      render(); return;
+    }
+
+    case 'calculateBands': {
+      const bReps   = parseFloat(state.bandReps);
+      const totalKg = state.selectedBands.reduce((s, id) => { const b = BANDS.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
+      if (totalKg <= 0) { showErr('Please select at least one resistance band.'); return; }
+      if (!bReps || bReps <= 0) { showErr('Please enter the number of reps you can do.'); return; }
+      state.oneRM = bReps === 1 ? round25(totalKg) : epley(totalKg, bReps);
+      state.step = 6; break;
+    }
 
     case 'openRecording':
       // 👇 Replace this URL with your actual recording link
