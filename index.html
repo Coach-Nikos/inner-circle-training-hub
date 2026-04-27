@@ -839,6 +839,99 @@
     text-transform: uppercase;
   }
 
+  /* ── Programme dates ── */
+  .dates-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #555;
+    transition: color 0.2s;
+    user-select: none;
+  }
+
+  .dates-toggle:hover { color: #e74c3c; }
+
+  .dates-toggle-icon {
+    font-size: 15px;
+  }
+
+  .dates-toggle-text {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .dates-toggle em {
+    font-style: normal;
+    color: #3a3a3a;
+    font-size: 11px;
+    margin-left: 4px;
+  }
+
+  .dates-picker-wrap {
+    margin-top: 16px;
+    background: #111;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .dates-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dates-row label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #555;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    min-width: 80px;
+  }
+
+  .dates-row input[type="date"] {
+    flex: 1;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    color-scheme: dark;
+  }
+
+  .dates-row input[type="date"]:focus { border-color: #e74c3c; }
+
+  .dates-end-display {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 700;
+    color: #e74c3c;
+    padding: 10px 14px;
+    background: rgba(231,76,60,0.06);
+    border: 1px solid rgba(231,76,60,0.2);
+    border-radius: 8px;
+  }
+
+  .week-date-range {
+    font-size: 11px;
+    color: #555;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-left: 6px;
+  }
+
   /* ── YouTube demo button ── */
   .yt-demo-btn {
     display: flex;
@@ -1566,6 +1659,8 @@ const state = {
   ascendSets: 5,
   reverseSets: 5,
   straightSets: 4,
+  showDates: false,
+  programStartDate: '',
 };
 
 // ── Data ───────────────────────────────────────────────
@@ -1873,6 +1968,16 @@ function handleSearch(e) {
 }
 
 // Generate week labels that scale with any programme length
+function weekDateRange(weekIndex) {
+  if (!state.programStartDate) return '';
+  const start = new Date(state.programStartDate);
+  start.setDate(start.getDate() + weekIndex * 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const fmt2 = d => d.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+  return fmt2(start) + ' – ' + fmt2(end);
+}
+
 function buildWeekLabels(n) {
   if (n === 1) return ['Max Effort'];
   if (n === 2) return ['Foundation', 'Peak'];
@@ -2546,10 +2651,19 @@ function step7() {
   const sysName = tabs.find(t => t.key === sys)?.label || sys;
   let copyText = `🏋️ ${state.lift.toUpperCase()} — ${sysName.toUpperCase()}\n`;
   copyText += `Estimated 1RM: ${fmt(rm)} ${u}  |  ${n} Weeks + Deload\n`;
+  if (state.programStartDate) {
+    const progStart = new Date(state.programStartDate);
+    const progEnd   = new Date(state.programStartDate);
+    progEnd.setDate(progEnd.getDate() + (n + 1) * 7 - 1);
+    const fmtD = d => d.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+    copyText += `Programme Dates: ${fmtD(progStart)} → ${fmtD(progEnd)}\n`;
+  }
   copyText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   weeks.forEach((wk, wi) => {
     copyText += `WEEK ${wi + 1} — ${wk.label}`;
     if (wk.note) copyText += ` (${wk.note})`;
+    const dr = weekDateRange(wi);
+    if (dr) copyText += `  📅 ${dr}`;
     copyText += `\n`;
     wk.rows.forEach(r => {
       copyText += `  ${r.label}:  ${r.reps}  ·  ${r.prefix || ''}${fmt(r.weight)} ${u}${r.suffix || ''}\n`;
@@ -2575,7 +2689,7 @@ function step7() {
     return `<div class="prog-week ${wk.cls}">
       <div class="prog-week-header">
         <span class="prog-week-num">Week ${wi+1}</span>
-        <span class="prog-week-label">${wk.label} <span style="color:#555;font-weight:500;">— ${wk.note}</span></span>
+        <span class="prog-week-label">${wk.label} <span style="color:#555;font-weight:500;">— ${wk.note}</span>${weekDateRange(wi) ? `<span class="week-date-range">· ${weekDateRange(wi)}</span>` : ''}</span>
       </div>
       ${rowsHtml}
     </div>`;
@@ -2604,6 +2718,26 @@ function step7() {
         <button class="weeks-btn" data-a="incrWeeks">+</button>
       </div>
       <p class="weeks-picker-note">Min 2 weeks · Max 12 weeks · + Deload week included</p>
+      <div class="dates-toggle" data-a="toggleDates">
+        <span class="dates-toggle-icon">${state.showDates ? '📅' : '📅'}</span>
+        <span class="dates-toggle-text">${state.showDates ? 'Hide programme dates' : 'Add programme dates'}</span>
+        <em>optional</em>
+      </div>
+      ${state.showDates ? `
+      <div class="dates-picker-wrap">
+        <div class="dates-row">
+          <label>Start Date</label>
+          <input type="date" id="progStartDate" value="${state.programStartDate}">
+        </div>
+        <div class="dates-row">
+          <label>End Date</label>
+          <div class="dates-end-display">${state.programStartDate ? (() => {
+            const end = new Date(state.programStartDate);
+            end.setDate(end.getDate() + (n + 1) * 7 - 1);
+            return end.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+          })() : 'Set a start date above'}</div>
+        </div>
+      </div>` : ''}
     </div>
     <div class="prog-tabs">${tabsHtml}</div>
     ${weeksHtml}
@@ -2636,6 +2770,8 @@ function wireEvents() {
   if (sx) sx.addEventListener('input', handleSearch);
   const br = document.getElementById('iBandReps');
   if (br) br.addEventListener('input', e => { state.bandReps = e.target.value; });
+  const pd = document.getElementById('progStartDate');
+  if (pd) pd.addEventListener('input', e => { state.programStartDate = e.target.value; render(); });
 }
 
 function showErr(msg) {
@@ -2720,6 +2856,11 @@ function onAction(e) {
       if (state.programWeeks > 2) state.programWeeks--;
       render(); return;
 
+    case 'toggleDates':
+      state.showDates = !state.showDates;
+      if (!state.showDates) state.programStartDate = '';
+      render(); return;
+
     case 'restart':
       Object.assign(state, {
         step: 1, bodyArea: null, movement: null, type: null, lift: null,
@@ -2728,6 +2869,7 @@ function onAction(e) {
         inLibrary: false, libraryCategory: null,
         trainingMode: null, selectedBands: [], bandReps: '',
         straightRange: '10-12', ascendSets: 5, reverseSets: 5, straightSets: 4,
+        showDates: false, programStartDate: '',
       }); break;
 
     case 'selectStraightRange':
