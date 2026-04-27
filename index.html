@@ -2501,15 +2501,14 @@ function step6() {
     }).join('');
     const selector    = sys.adjustable ? setsSelector(sys.setsAction, sys.setsCount, sys.color) : '';
     const startSel    = sys.startSelector || '';
+    const hasControls = selector || startSel;
     return `<div class="system-card">
-      <div class="system-card-header" style="flex-wrap:wrap;gap:8px;">
+      <div class="system-card-header">
         <div class="system-color-bar" style="background:${sys.color}"></div>
         <div style="flex:1;min-width:0;">
           <div class="system-name" style="color:${sys.color}">${sys.name}</div>
           <div class="system-desc">${sys.desc}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          ${selector}${startSel}
+          ${hasControls ? `<div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">${selector}${startSel}</div>` : ''}
         </div>
       </div>
       ${rows}
