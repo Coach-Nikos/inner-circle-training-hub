@@ -1420,6 +1420,43 @@
 
   .straight-rule strong { color: #22c55e; }
 
+  /* ── Sets selector ── */
+  .sets-selector {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+  }
+
+  .sets-selector-label {
+    font-size: 10px;
+    color: #444;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-right: 2px;
+  }
+
+  .sets-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1.5px solid #2a2a2a;
+    background: transparent;
+    color: #555;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sets-btn:hover { border-color: #555; color: #aaa; }
+  .sets-btn.active { color: #111; font-weight: 900; }
+
   /* ── Training mode choice cards ── */
   .mode-choice-grid {
     display: grid;
@@ -1526,6 +1563,9 @@ const state = {
   selectedBands: [],
   bandReps: '',
   straightRange: '10-12',
+  ascendSets: 5,
+  reverseSets: 5,
+  straightSets: 4,
 };
 
 // ── Data ───────────────────────────────────────────────
@@ -2218,22 +2258,41 @@ function step6() {
     </div>`;
   }).join('');
 
-  // All four training systems
+  // Helper: sets selector buttons
+  function setsSelector(action, current, color) {
+    return '<div class="sets-selector">' +
+      '<span class="sets-selector-label">Sets</span>' +
+      [3,4,5].map(n => {
+        const active = current === n;
+        return '<button class="sets-btn' + (active ? ' active' : '') + '" ' +
+          'style="' + (active ? 'border-color:' + color + ';background:' + color + ';' : '') + '" ' +
+          'data-a="' + action + '" data-v="' + n + '">' + n + '</button>';
+      }).join('') +
+      '</div>';
+  }
+
+  // Full set arrays
+  const ascendFull  = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
+  const reverseFull = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
+  const ascendSlice  = ascendFull.slice(ascendFull.length - state.ascendSets);
+  const reverseSlice = reverseFull.slice(0, state.reverseSets);
+
   const sysData = [
     {
       key: 'ascend', name: 'Ascend Pyramid', color: '#f59e0b',
-      desc: '15 → 12 → 10 → 8 → 6 reps',
-      sets: [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}],
+      desc: ascendSlice.map(s => s.reps).join(' → ') + ' reps',
+      sets: ascendSlice, adjustable: true, setsAction: 'setAscendSets', setsCount: state.ascendSets,
     },
     {
       key: 'reverse', name: 'Reverse Pyramid', color: '#8b5cf6',
-      desc: '6 → 8 → 10 → 12 → 15 reps',
-      sets: [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}],
+      desc: reverseSlice.map(s => s.reps).join(' → ') + ' reps',
+      sets: reverseSlice, adjustable: true, setsAction: 'setReverseSets', setsCount: state.reverseSets,
     },
     {
       key: '5x5', name: '5x5 Strength Training', color: '#3b82f6',
       desc: '5 sets · 5 reps · same weight',
       sets: [{reps:5,pct:85},{reps:5,pct:85},{reps:5,pct:85},{reps:5,pct:85},{reps:5,pct:85}],
+      adjustable: false,
     },
     {
       key: 'cycle', name: 'Percentage Training Cycle (PTC)', color: '#e74c3c',
@@ -2243,10 +2302,11 @@ function step6() {
         {reps:6,pct:80,label:'Wk 3'},{reps:5,pct:85,label:'Wk 4'},
         {reps:3,pct:90,label:'Wk 5'},{reps:1,pct:100,label:'Wk 6'},
       ],
+      adjustable: false,
     },
   ];
 
-  // Straight Sets card
+  // Straight Sets card (shown first)
   const straightRanges = {
     '6-8':   { low: 6,  high: 8,  pct: 85 },
     '8-10':  { low: 8,  high: 10, pct: 80 },
@@ -2259,7 +2319,8 @@ function step6() {
   const srRangeBtns = Object.keys(straightRanges).map(k =>
     `<button class="range-btn ${state.straightRange === k ? 'active' : ''}" data-a="selectStraightRange" data-v="${k}">${k} reps</button>`
   ).join('');
-  const srRows = Array.from({length: 4}, (_, i) => {
+  const srSetsSelector = setsSelector('setStraightSets', state.straightSets, '#22c55e');
+  const srRows = Array.from({length: state.straightSets}, (_, i) => {
     const wtDisplay = state.trainingMode === 'bands'
       ? `<span class="set-weight" style="color:#22c55e;font-size:11px;text-align:right;">${bandDots(srWgtKg)}${bandLabel(srWgtKg)}</span>`
       : `<span class="set-weight" style="color:#22c55e">${fmt(srWgt)} ${u}</span>`;
@@ -2274,8 +2335,9 @@ function step6() {
       <div class="system-color-bar" style="background:#22c55e"></div>
       <div>
         <div class="system-name" style="color:#22c55e">Straight Sets</div>
-        <div class="system-desc">4 sets · same weight · rep range method</div>
+        <div class="system-desc">${state.straightSets} sets · same weight · rep range method</div>
       </div>
+      ${srSetsSelector}
     </div>
     <div class="straight-range-wrap">
       <div class="straight-range-label">Select Rep Range</div>
@@ -2303,6 +2365,7 @@ function step6() {
         ${sysWtDisplay}
       </div>`;
     }).join('');
+    const selector = sys.adjustable ? setsSelector(sys.setsAction, sys.setsCount, sys.color) : '';
     return `<div class="system-card">
       <div class="system-card-header">
         <div class="system-color-bar" style="background:${sys.color}"></div>
@@ -2310,6 +2373,7 @@ function step6() {
           <div class="system-name" style="color:${sys.color}">${sys.name}</div>
           <div class="system-desc">${sys.desc}</div>
         </div>
+        ${selector}
       </div>
       ${rows}
     </div>`;
@@ -2331,7 +2395,7 @@ function step6() {
     <div class="divider"></div>
     <div class="section-heading">Your Numbers Across All Training Systems</div>
     <div class="section-sub">${state.lift} · Based on estimated 1RM of ${fmt(rm)} ${u}</div>
-    <div class="systems-grid">${systemCards}${straightCard}</div>
+    <div class="systems-grid">${straightCard}${systemCards}</div>
     <button class="calc-btn" data-a="genProg" style="margin-bottom:16px;">
       📅 GENERATE MY NUMBERS TO PLAN MY TRAINING SESSIONS →
     </button>
@@ -2374,7 +2438,8 @@ function step7() {
   let weeks = [];
 
   if (sys === 'ascend') {
-    const base = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
+    const fullA = [{reps:15,pct:60},{reps:12,pct:67},{reps:10,pct:75},{reps:8,pct:80},{reps:6,pct:85}];
+    const base  = fullA.slice(fullA.length - state.ascendSets);
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => ({
       label: lbl,
@@ -2386,7 +2451,8 @@ function step7() {
       })),
     }));
   } else if (sys === 'reverse') {
-    const base = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
+    const fullR = [{reps:6,pct:85},{reps:8,pct:80},{reps:10,pct:75},{reps:12,pct:67},{reps:15,pct:60}];
+    const base  = fullR.slice(0, state.reverseSets);
     const wkLabels = buildWeekLabels(n);
     weeks = wkLabels.map((lbl, wi) => ({
       label: lbl,
@@ -2426,7 +2492,7 @@ function step7() {
         label: lbl,
         note: note,
         cls: wkInPhase === phaseLen - 1 ? 'pw-green' : (isNewPhase ? 'pw-red' : ''),
-        rows: Array.from({length: 4}, (_, si) => ({
+        rows: Array.from({length: state.straightSets}, (_, si) => ({
           label: `Set ${si+1}`,
           reps: `${sr7.low}–${sr7.high} reps`,
           weight: wgt,
@@ -2466,7 +2532,7 @@ function step7() {
     : sys === '5x5'
     ? Array.from({length: 5}, (_, si) => ({ label: `Set ${si+1}`, reps: '5 reps', weight: round25(rm * 0.5), green: true }))
     : sys === 'straight'
-    ? Array.from({length: 4}, (_, si) => ({ label: `Set ${si+1}`, reps: `${sr7.low}–${sr7.high} reps`, weight: round25(rm * 0.5), green: true }))
+    ? Array.from({length: state.straightSets}, (_, si) => ({ label: `Set ${si+1}`, reps: `${sr7.low}–${sr7.high} reps`, weight: round25(rm * 0.5), green: true }))
     : [{ label: 'All Sets', reps: '5–10 reps', weight: round25(rm * 0.5), green: true, prefix: '', suffix: '' }];
 
   weeks.push({
@@ -2661,11 +2727,20 @@ function onAction(e) {
         directEntry: false, selectedSystem: 'ascend', programWeeks: 6,
         inLibrary: false, libraryCategory: null,
         trainingMode: null, selectedBands: [], bandReps: '',
-        straightRange: '10-12',
+        straightRange: '10-12', ascendSets: 5, reverseSets: 5, straightSets: 4,
       }); break;
 
     case 'selectStraightRange':
       state.straightRange = v; render(); return;
+
+    case 'setStraightSets':
+      state.straightSets = parseInt(v); render(); return;
+
+    case 'setAscendSets':
+      state.ascendSets = parseInt(v); render(); return;
+
+    case 'setReverseSets':
+      state.reverseSets = parseInt(v); render(); return;
 
     case 'selectTrainingMode':
       state.trainingMode = v || null;
