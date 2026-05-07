@@ -1709,6 +1709,8 @@ const state = {
   straightSets: 4,
   showDates: false,
   programStartDate: '',
+  bandCustomMode: false,
+  customBandWeights: [2, 5, 9, 14, 18],
 };
 
 // ── Data ───────────────────────────────────────────────
@@ -1928,18 +1930,29 @@ function round25(v) { return Math.round(v / 2.5) * 2.5; }
 function fmt(v) { return v % 1 === 0 ? String(v) : v.toFixed(1); }
 
 
+// Returns the active bands array — standard or custom weights
+function activeBands() {
+  if (!state.bandCustomMode) return BANDS;
+  return BANDS.map((b, i) => ({
+    ...b,
+    kg:  state.customBandWeights[i] || b.kg,
+    lbs: Math.round((state.customBandWeights[i] || b.kg) * 2.205),
+  }));
+}
+
 // Find closest band combination for a target kg weight (brute-force 2^5 combos)
 function findBandCombo(targetKg) {
+  const bands = activeBands();
   let best = null, bestDiff = Infinity;
   for (let mask = 1; mask < 32; mask++) {
-    const combo = BANDS.filter((_, i) => mask & (1 << i));
+    const combo = bands.filter((_, i) => mask & (1 << i));
     const total = combo.reduce((s, b) => s + b.kg, 0);
     const diff  = Math.abs(total - targetKg);
     if (diff < bestDiff || (diff === bestDiff && best && combo.length < best.combo.length)) {
       bestDiff = diff; best = { combo, total };
     }
   }
-  return best || { combo: [BANDS[4]], total: BANDS[4].kg };
+  return best || { combo: [bands[4]], total: bands[4].kg };
 }
 
 function bandLabel(weightKg) {
@@ -2294,9 +2307,12 @@ function step5() {
 
   // ── BAND MODE ──────────────────────────────────────────
   if (state.trainingMode === 'bands') {
-    const totalKg  = state.selectedBands.reduce((s, id) => { const b = BANDS.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
+    const ab       = activeBands();
+    const totalKg  = state.selectedBands.reduce((s, id) => { const b = ab.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
     const totalLbs = Math.round(totalKg * 2.205);
-    const circles  = BANDS.map(b => {
+
+    // Standard colour picker
+    const circles = ab.map(b => {
       const sel = state.selectedBands.includes(b.id);
       return '<div class="band-circle ' + (sel ? 'sel' : '') + '" data-a="toggleBand" data-v="' + b.id + '">' +
         '<div class="band-dot" style="background:' + b.color + '"></div>' +
@@ -2306,15 +2322,45 @@ function step5() {
         '</div>';
     }).join('');
 
+    // Custom weight inputs (shown when bandCustomMode is on)
+    const customInputs = ab.map((b, i) =>
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+        '<div style="width:14px;height:14px;border-radius:50%;background:' + b.color + ';flex-shrink:0;border:1px solid #444;"></div>' +
+        '<span style="font-size:12px;color:#ccc;min-width:50px;">' + b.name + '</span>' +
+        '<input id="customBand_' + i + '" type="number" min="0.5" max="200" step="0.5" value="' + b.kg + '" ' +
+          'style="width:70px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#fff;font-size:13px;padding:5px 8px;text-align:center;" ' +
+          'data-a="setCustomBand" data-v="' + i + '">' +
+        '<span style="font-size:12px;color:#555;">kg</span>' +
+        '<span style="font-size:11px;color:#444;">(~' + Math.round(b.kg * 2.205) + ' lbs)</span>' +
+      '</div>'
+    ).join('');
+
+    const bandPickerSection = !state.bandCustomMode
+      ? '<div class="input-label">Select Your Resistance Bands</div>' +
+        '<p style="font-size:13px;color:#555;margin-bottom:20px;line-height:1.6;">Tap each band you\'re using — you can combine multiple bands. The resistance adds up automatically.</p>' +
+        '<div class="band-selector">' + circles + '</div>' +
+        (totalKg > 0 ? '<div class="band-total">Total Resistance: <strong>' + totalKg + ' kg</strong> <span style="color:#555;font-size:13px;">(~' + totalLbs + ' lbs)</span></div>' : '') +
+        '<div style="margin-top:20px;padding-top:16px;border-top:1px solid #222;">' +
+          '<span style="font-size:12px;color:#555;">Got a different brand or set? </span>' +
+          '<span style="font-size:12px;color:#e74c3c;cursor:pointer;font-weight:700;" data-a="toggleBandCustomMode">Enter my band resistances manually →</span>' +
+        '</div>'
+      : '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+          '<div class="input-label" style="margin-bottom:0;">My Band Resistances (kg)</div>' +
+          '<span style="font-size:12px;color:#e74c3c;cursor:pointer;font-weight:700;" data-a="toggleBandCustomMode">← Use standard colours</span>' +
+        '</div>' +
+        '<p style="font-size:12px;color:#555;margin-bottom:16px;line-height:1.6;">Set the resistance of each of your bands below, then select which ones you\'re using above.</p>' +
+        customInputs +
+        '<div style="margin-top:16px;">' +
+          '<div class="input-label">Select the Bands You\'re Using</div>' +
+          '<div class="band-selector">' + circles + '</div>' +
+          (totalKg > 0 ? '<div class="band-total">Total Resistance: <strong>' + totalKg + ' kg</strong> <span style="color:#555;font-size:13px;">(~' + totalLbs + ' lbs)</span></div>' : '') +
+        '</div>';
+
     return header +
       rpeWidget() +
       '<p class="step-subtitle" style="margin-top:20px;">Select the resistance bands you\'re using and enter your reps — we\'ll calculate your estimated 1RM and show you exactly which band combinations to use for every set and every week of your programme.</p>' +
       '<div class="input-card">' +
-        '<div class="input-label">Select Your Resistance Bands</div>' +
-        '<p style="font-size:13px;color:#555;margin-bottom:20px;line-height:1.6;">Tap each band you\'re using — you can combine multiple bands. The resistance adds up automatically.</p>' +
-        '<div class="band-selector">' + circles + '</div>' +
-        (totalKg > 0 ?
-          '<div class="band-total">Total Resistance: <strong>' + totalKg + ' kg</strong> <span style="color:#555;font-size:13px;">(~' + totalLbs + ' lbs)</span></div>' : '') +
+        bandPickerSection +
         '<div class="input-label" style="margin-top:24px;">How Many Reps Can You Do With These Bands?</div>' +
         '<div class="inputs-row" style="grid-template-columns:1fr;">' +
           '<div class="input-group">' +
@@ -2842,6 +2888,14 @@ function wireEvents() {
   if (sx) sx.addEventListener('input', handleSearch);
   const br = document.getElementById('iBandReps');
   if (br) br.addEventListener('input', e => { state.bandReps = e.target.value; });
+  // Custom band weight inputs
+  BANDS.forEach((_, i) => {
+    const cb = document.getElementById('customBand_' + i);
+    if (cb) cb.addEventListener('change', e => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) { state.customBandWeights[i] = val; render(true); }
+    });
+  });
   const pd = document.getElementById('progStartDate');
   if (pd) pd.addEventListener('input', e => { state.programStartDate = e.target.value; render(); });
 }
@@ -2977,9 +3031,29 @@ function onAction(e) {
       render(true); return;
     }
 
+    case 'toggleBandCustomMode':
+      state.bandCustomMode = !state.bandCustomMode;
+      state.selectedBands = [];
+      if (!state.bandCustomMode) state.customBandWeights = [2, 5, 9, 14, 18];
+      render(true); return;
+
+    case 'setCustomBand': {
+      const bandIdx = parseInt(v);
+      const input = document.getElementById('customBand_' + bandIdx);
+      if (input) {
+        const val = parseFloat(input.value);
+        if (!isNaN(val) && val > 0) {
+          state.customBandWeights[bandIdx] = val;
+          render(true);
+        }
+      }
+      return;
+    }
+
     case 'calculateBands': {
       const bReps   = parseFloat(state.bandReps);
-      const totalKg = state.selectedBands.reduce((s, id) => { const b = BANDS.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
+      const ab      = activeBands();
+      const totalKg = state.selectedBands.reduce((s, id) => { const b = ab.find(b => b.id === id); return s + (b ? b.kg : 0); }, 0);
       if (totalKg <= 0) { showErr('Please select at least one resistance band.'); return; }
       if (!bReps || bReps <= 0) { showErr('Please enter the number of reps you can do.'); return; }
       state.oneRM = bReps === 1 ? round25(totalKg) : epley(totalKg, bReps);
