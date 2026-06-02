@@ -2888,13 +2888,19 @@ function wireEvents() {
   if (sx) sx.addEventListener('input', handleSearch);
   const br = document.getElementById('iBandReps');
   if (br) br.addEventListener('input', e => { state.bandReps = e.target.value; });
-  // Custom band weight inputs
+  // Custom band weight inputs — update state silently (no re-render) so typing isn't interrupted
   BANDS.forEach((_, i) => {
     const cb = document.getElementById('customBand_' + i);
-    if (cb) cb.addEventListener('change', e => {
-      const val = parseFloat(e.target.value);
-      if (!isNaN(val) && val > 0) { state.customBandWeights[i] = val; render(true); }
-    });
+    if (cb) {
+      cb.addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0) state.customBandWeights[i] = val;
+      });
+      cb.addEventListener('blur', e => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0) { state.customBandWeights[i] = val; render(true); }
+      });
+    }
   });
   const pd = document.getElementById('progStartDate');
   if (pd) pd.addEventListener('input', e => { state.programStartDate = e.target.value; render(); });
